@@ -103,6 +103,35 @@ struct ThumbState {
     var isTired: Bool { stamina < Stamina.tired }
 }
 
+/// Everything that can change between matches. Story challenges tweak these.
+struct MatchRules: Equatable {
+    /// First to this many pins wins; nil means the timer alone decides.
+    var pointsToWin: Int? = 3
+    var seconds: Float?
+    var pinSeconds: Float = Arena.pinDuration
+    /// Overrides the CPU difficulty from Settings.
+    var cpuLevel: CPULevel?
+    /// Per side (left, right): stamina regen and movement speed multipliers.
+    var regen: [Float] = [1, 1]
+    var agility: [Float] = [1, 1]
+
+    static func quick(_ length: MatchLength) -> MatchRules {
+        MatchRules(pointsToWin: length.seconds == nil ? 3 : nil, seconds: length.seconds)
+    }
+}
+
+/// What happened in a match: feeds stars, achievements and leaderboards.
+struct MatchStats {
+    var pins = [0, 0]
+    var jumpPins = [0, 0]
+    var escapes = [0, 0]
+    var reversals = [0, 0]
+    var fightTime: Float = 0
+    var lowestStamina: [Float] = [1, 1]
+    /// Who scored a pin after the buzzer.
+    var overtimeScorer: Side?
+}
+
 enum GameEvent {
     case chantBeat(Int)
     case slam, lunge, land, tired
@@ -122,7 +151,12 @@ final class ThumbWarGame {
 
     static let chantWords = ["1", "2", "3", "THUMB WAR!"]
     static let chantBeat: Float = 0.6
-    static let pointsToWin = 3
+    #if DEBUG
+    /// Test hook: `-debugSleepyRival YES` keeps the CPU from moving.
+    static let sleepyRival = UserDefaults.standard.bool(forKey: "debugSleepyRival")
+    #else
+    static let sleepyRival = false
+    #endif
 
     private(set) var stage: Stage = .menu
     private(set) var mode: Mode = .vsCPU
@@ -135,11 +169,18 @@ final class ThumbWarGame {
     private(set) var isOvertime = false
     /// The pinned thumb was hooking: winning the tug flips the pin instead of just escaping.
     private(set) var pinIsReversible = false
-    private(set) var matchLength: MatchLength = .seconds60
+    private(set) var rules = MatchRules()
+    /// Shown instead of "CPU" when facing a Thumb Tour rival.
+    var rivalName: String?
+    private(set) var stats = MatchStats()
     var isPaused = false
 
     @ObservationIgnored var slamControl: SlamControl = .lift
     @ObservationIgnored var cpuLevel: CPULevel = .normal
+    @ObservationIgnored private var pinFromLunge = false
+
+    /// The difficulty the CPU actually plays at in this match.
+    var effectiveCPULevel: CPULevel { rules.cpuLevel ?? cpuLevel }
     @ObservationIgnored private(set) var thumbs: [ThumbState]
     @ObservationIgnored var onEvent: (GameEvent) -> Void = { _ in }
     @ObservationIgnored private(set) var time: Float = 0
@@ -184,16 +225,26 @@ final class ThumbWarGame {
     // MARK: - Flow
 
     func start(mode: Mode, length: MatchLength) {
+        start(mode: mode, rules: .quick(length))
+    }
+
+    func start(mode: Mode, rules: MatchRules) {
         self.mode = mode
-        matchLength = length
+        self.rules = rules
+        stats = MatchStats()
         scores = [0, 0]
-        clock = length.seconds
+        clock = rules.seconds
         secondsLeft = clock.map { Int($0) }
         isOvertime = false
         isPaused = false
         cpu = CPUBrain()
         for i in thumbs.indices { thumbs[i].stamina = 1 }
         startRound()
+    }
+
+    /// Same mode, same rules.
+    func rematch() {
+        start(mode: mode, rules: rules)
     }
 
     func backToMenu() {
@@ -292,7 +343,7 @@ final class ThumbWarGame {
     private func tick(_ dt: Float) {
         time += dt
         stageTime += dt
-        if mode == .vsCPU, isPlaying { cpu.think(game: self, dt: dt) }
+        if mode == .vsCPU, isPlaying, !Self.sleepyRival { cpu.think(game: self, dt: dt) }
 
         switch stage {
         case .menu:
@@ -302,11 +353,13 @@ final class ThumbWarGame {
         case .fight:
             fightRules(dt)
             runClock(dt)
+            trackStats(dt)
             if let c = clock, c <= 0 { endMatch() }
         case .pinned(let pinner):
             fightRules(dt)
             runClock(dt)
-            pinProgress = min(stageTime / Arena.pinDuration, 1)
+            trackStats(dt)
+            pinProgress = min(stageTime / rules.pinSeconds, 1)
             let tickIndex = Int(pinProgress * 3)
             if tickIndex != lastPinTick, tickIndex < 3 {
                 lastPinTick = tickIndex
@@ -333,6 +386,13 @@ final class ThumbWarGame {
         integrate(dt)
     }
 
+    private func trackStats(_ dt: Float) {
+        stats.fightTime += dt
+        for i in thumbs.indices {
+            stats.lowestStamina[i] = min(stats.lowestStamina[i], thumbs[i].stamina)
+        }
+    }
+
     private func runClock(_ dt: Float) {
         guard var c = clock else { return }
         c = max(0, c - dt)
@@ -341,10 +401,16 @@ final class ThumbWarGame {
     }
 
     private func scorePoint(_ side: Side) {
-        scores[side.rawValue] += 1
+        let i = side.rawValue
+        scores[i] += 1
+        stats.pins[i] += 1
+        if pinFromLunge { stats.jumpPins[i] += 1 }
+        if isOvertime { stats.overtimeScorer = side }
         onEvent(.point(side))
-        if clock == nil {
-            if scores[side.rawValue] >= Self.pointsToWin { endMatch() } else { setStage(.roundOver(winner: side)) }
+        if let target = rules.pointsToWin, scores[i] >= target {
+            endMatch()
+        } else if clock == nil {
+            setStage(.roundOver(winner: side))
         } else if isOvertime || (clock ?? 0) <= 0 {
             endMatch()
         } else {
@@ -438,7 +504,7 @@ final class ThumbWarGame {
 
             switch thumbs[i].phase {
             case .raised:
-                thumbs[i].stamina = min(1, thumbs[i].stamina + Stamina.regenRaised * dt)
+                thumbs[i].stamina = min(1, thumbs[i].stamina + Stamina.regenRaised * rules.regen[i] * dt)
                 if control(for: side) == .lift && !thumbs[i].isTouching && stage == .fight {
                     slam(side)
                 }
@@ -449,6 +515,7 @@ final class ThumbWarGame {
                     && distance(me.horizontal, them.horizontal) < Arena.pinRadius
                     && me.tip.y > them.tip.y - 0.005
                 if canPin {
+                    pinFromLunge = me.lunge != nil
                     thumbs[i].phase = .pinning
                     thumbs[i].lunge = nil
                     thumbs[i].exhausted = false
@@ -467,7 +534,7 @@ final class ThumbWarGame {
                     onEvent(.land)
                 }
             case .down:
-                thumbs[i].stamina = min(1, thumbs[i].stamina + Stamina.regenDown * dt)
+                thumbs[i].stamina = min(1, thumbs[i].stamina + Stamina.regenDown * rules.regen[i] * dt)
                 thumbs[i].recover -= dt
                 let needed: Float = thumbs[i].exhausted ? Stamina.raiseAfterExhaustion : 0.05
                 let wantsUp = control(for: side) == .lift ? thumbs[i].isTouching : !thumbs[i].slamHeld
@@ -476,7 +543,7 @@ final class ThumbWarGame {
                     thumbs[i].exhausted = false
                 }
             case .pinning:
-                thumbs[i].stamina = min(1, thumbs[i].stamina + Stamina.regenPinning * dt)
+                thumbs[i].stamina = min(1, thumbs[i].stamina + Stamina.regenPinning * rules.regen[i] * dt)
                 // Pinner leans in to follow the wiggling thumb underneath.
                 thumbs[i].target = thumbs[opp].horizontal
             case .pinned:
@@ -501,6 +568,8 @@ final class ThumbWarGame {
         thumbs[f].velocity.y += 0.8
         thumbs[o].phase = .pinned
         thumbs[o].velocity = .zero
+        stats.reversals[f] += 1
+        pinFromLunge = false
         pinIsReversible = false
         escapeProgress = 0.5
         pinProgress = 0
@@ -517,6 +586,7 @@ final class ThumbWarGame {
         thumbs[p].velocity += SIMD3(away.x, 0.6, away.y) * 0.8
         thumbs[e].phase = control(for: pinner.opponent) == .lift && !thumbs[e].isTouching ? .down : .raised
         thumbs[e].recover = 0
+        stats.escapes[e] += 1
         escapeProgress = 0
         setStage(.fight)
         onEvent(.escape)
@@ -526,7 +596,7 @@ final class ThumbWarGame {
         for i in thumbs.indices {
             var t = thumbs[i]
             t.aimAge += dt
-            let agility = Stamina.agility(t.stamina)
+            let agility = Stamina.agility(t.stamina) * rules.agility[i]
             var kH: Float = 380 * agility
             let kV: Float
             var goalY: Float
@@ -647,7 +717,7 @@ private struct CPUBrain {
     var aimOffset: SIMD2<Float> = .zero
 
     mutating func think(game: ThumbWarGame, dt: Float) {
-        let profile = CPUProfile.of(game.cpuLevel)
+        let profile = CPUProfile.of(game.effectiveCPULevel)
         let me = game.thumb(.right), them = game.thumb(.left)
         let humanMashes = game.control(for: .left) == .button
 

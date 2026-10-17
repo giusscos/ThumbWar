@@ -10,7 +10,7 @@ import SwiftUI
 
 extension ThumbWarGame {
     func label(_ side: Side, viewer: Side? = nil) -> String {
-        if mode == .vsCPU { return side == .left ? "You" : "CPU" }
+        if mode == .vsCPU { return side == .left ? "You" : (rivalName ?? "CPU") }
         if let viewer { return side == viewer ? "You" : side.name }
         return side.name
     }
@@ -156,6 +156,7 @@ struct StageBanner: View {
     let feedback: GameFeedback
     let viewer: Side?
     var compact = false
+    @Environment(Career.self) private var career
 
     private var scale: CGFloat { compact ? 0.75 : 1 }
 
@@ -171,7 +172,11 @@ struct StageBanner: View {
             fittingPop("+1 \(game.label(winner, viewer: viewer))!", size: 60 * scale, color: PuffyPalette.team(winner))
                 .allowsHitTesting(false)
         case .matchOver(let winner):
-            result(winner)
+            if game.mode == .vsCPU, let story = career.storyResult {
+                StoryResultView(result: story, game: game, settings: settings, feedback: feedback)
+            } else {
+                result(winner)
+            }
         case .menu, .fight:
             EmptyView()
         }
@@ -236,11 +241,12 @@ struct StageBanner: View {
             HStack(spacing: 14) {
                 PuffyButton(title: "Rematch", color: PuffyPalette.blue, compact: compact) {
                     feedback.tap()
-                    game.start(mode: game.mode, length: game.matchLength)
+                    game.rematch()
                 }
                 PuffyButton(title: "Menu", color: .orange, compact: compact) {
                     feedback.tap()
                     game.backToMenu()
+                    career.leave(settings: settings)
                 }
             }
         }
@@ -255,33 +261,33 @@ struct MenuView: View {
     let feedback: GameFeedback
     @Binding var showSettings: Bool
     @Binding var showLocker: Bool
+    @Binding var showTrophies: Bool
+    @Environment(Career.self) private var career
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .top) {
             VStack(spacing: 14) {
                 ViewThatFits(in: .horizontal) {
-                    PuffyText(text: "THUMB WAR", size: 60, color: .orange)
+                    // Landscape shares the top row with the corner buttons, so it's a bit smaller.
+                    PuffyText(text: "THUMB WAR", size: verticalSizeClass == .compact ? 50 : 60, color: .orange)
                     PuffyText(text: "THUMB WAR", size: 44, color: .orange)
                 }
                 // Clear of the corner buttons in portrait; landscape keeps it off the thumbs.
                 .padding(.top, verticalSizeClass == .compact ? 8 : 96)
                 Spacer()
-                HStack(spacing: 14) {
-                    PuffyButton(title: "Play vs CPU", color: PuffyPalette.blue) {
-                        feedback.tap()
-                        game.start(mode: .vsCPU, length: settings.matchLength)
-                    }
-                    PuffyButton(title: "2 Players", color: PuffyPalette.red) {
-                        feedback.tap()
-                        game.start(mode: .twoPlayers, length: settings.matchLength)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { tourButton; quickButton; twoPlayerButton }
+                    VStack(spacing: 12) {
+                        tourButton
+                        HStack(spacing: 12) { quickButton; twoPlayerButton }
                     }
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.bottom, 20)
 
-            HStack {
+            HStack(spacing: 10) {
                 Button {
                     feedback.tap()
                     showLocker = true
@@ -292,7 +298,12 @@ struct MenuView: View {
                         .frame(height: 44)
                 }
                 .buttonStyle(.puffy(.pink))
+                RoundIconButton(systemName: "trophy.fill", color: .yellow) {
+                    feedback.tap()
+                    showTrophies = true
+                }
                 Spacer()
+                CoinPill(coins: career.profile.coins)
                 RoundIconButton(systemName: "gearshape.fill", color: .purple) {
                     feedback.tap()
                     showSettings = true
@@ -302,6 +313,44 @@ struct MenuView: View {
             .padding(.top, 12)
         }
     }
+
+    private var tourButton: some View {
+        Button {
+            feedback.tap()
+            career.showTour = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "map.fill")
+                Text("Thumb Tour")
+                HStack(spacing: 3) {
+                    StarIcon(filled: true, size: 14)
+                    Text("\(career.profile.totalStars)")
+                }
+                .font(.system(.subheadline, design: .rounded, weight: .black))
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(.white.opacity(0.25), in: Capsule())
+            }
+            .font(.system(.title3, design: .rounded, weight: .heavy))
+            .shadow(color: .black.opacity(0.18), radius: 0, y: 1.5)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 13)
+        }
+        .buttonStyle(.puffy(.orange))
+    }
+
+    private var quickButton: some View {
+        PuffyButton(title: "Quick Play", color: PuffyPalette.blue) {
+            feedback.tap()
+            career.playQuick(.vsCPU, game: game, settings: settings)
+        }
+    }
+
+    private var twoPlayerButton: some View {
+        PuffyButton(title: "2 Players", color: PuffyPalette.red) {
+            feedback.tap()
+            career.playQuick(.twoPlayers, game: game, settings: settings)
+        }
+    }
 }
 
 struct PauseMenu: View {
@@ -309,12 +358,27 @@ struct PauseMenu: View {
     let settings: GameSettings
     let feedback: GameFeedback
     @Binding var showSettings: Bool
+    @Environment(Career.self) private var career
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.4).ignoresSafeArea()
             VStack(spacing: 16) {
                 PuffyText(text: "Paused", size: 56, color: .orange)
+                if let challenge = career.activeChallenge {
+                    // Remind the player what the stars are for.
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("vs \(challenge.rival)")
+                            .font(.system(.headline, design: .rounded, weight: .black))
+                        ForEach(["Win the match"] + challenge.goals.prefix(2).map(\.text), id: \.self) { goal in
+                            Label(goal, systemImage: "star.fill")
+                                .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(.black.opacity(0.3), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) { buttons }
                     VStack(spacing: 10) { buttons }
@@ -331,7 +395,7 @@ struct PauseMenu: View {
         }
         PuffyButton(title: "Restart", color: PuffyPalette.blue) {
             feedback.tap()
-            game.start(mode: game.mode, length: settings.matchLength)
+            game.rematch()
         }
         PuffyButton(title: "Settings", color: .purple) {
             feedback.tap()
@@ -340,6 +404,7 @@ struct PauseMenu: View {
         PuffyButton(title: "Quit", color: PuffyPalette.red) {
             feedback.tap()
             game.backToMenu()
+            career.leave(settings: settings)
         }
     }
 }

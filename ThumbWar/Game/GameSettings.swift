@@ -56,15 +56,29 @@ final class GameSettings {
     var loadouts: [Loadout] {
         didSet { defaults.set(try? JSONEncoder().encode(loadouts), forKey: Keys.loadouts) }
     }
-    var unlocks = Unlocks()
     /// A try-on from the Locker (e.g. a locked item). Not saved.
     var preview: (side: Side, loadout: Loadout)?
+    /// What the Thumb Tour rival wears, while a challenge is on. Not saved.
+    var rivalLoadout: Loadout?
 
     func loadout(_ side: Side) -> Loadout { loadouts[side.rawValue] }
+
+    /// Takes off anything the player doesn't own (catalog changes, refunds).
+    func removeUnowned(_ owns: (Accessory) -> Bool) {
+        let cleaned = loadouts.map { loadout in
+            var kept = loadout
+            for slot in AccessorySlot.allCases {
+                if let item = Accessory.with(id: loadout[slot]), !owns(item) { kept[slot] = nil }
+            }
+            return kept
+        }
+        if cleaned != loadouts { loadouts = cleaned }
+    }
 
     /// What the thumb should show right now: the try-on if there is one.
     func effectiveLoadout(_ side: Side) -> Loadout {
         if let preview, preview.side == side { return preview.loadout }
+        if side == .right, let rivalLoadout { return rivalLoadout }
         return loadouts[side.rawValue]
     }
 
@@ -90,14 +104,5 @@ final class GameSettings {
             .flatMap { try? JSONDecoder().decode([Loadout].self, from: $0) }
             .flatMap { $0.count == 2 ? $0 : nil }
             ?? [Loadout(hat: "cap"), Loadout(hat: "party")]
-        // Take off anything that is no longer unlocked (catalog changes, season ended).
-        let owned = unlocks
-        loadouts = loadouts.map { loadout in
-            var kept = loadout
-            for slot in AccessorySlot.allCases {
-                if let item = Accessory.with(id: loadout[slot]), !owned.isUnlocked(item) { kept[slot] = nil }
-            }
-            return kept
-        }
     }
 }

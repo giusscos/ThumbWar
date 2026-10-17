@@ -2,8 +2,8 @@
 //  LockerView.swift
 //  ThumbWar
 //
-//  Dress up each thumb. Locked items can be tried on in the preview, but only
-//  unlocked ones can be equipped.
+//  Dress up each thumb, and the shop: any item can be tried on in the preview;
+//  coin items can be bought right here, premium ones come with purchases.
 //
 
 import SwiftUI
@@ -16,6 +16,7 @@ struct LockerView: View {
 
     @State private var side: Side = .left
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(Career.self) private var career
 
     private var landscape: Bool { verticalSizeClass == .compact }
 
@@ -37,7 +38,7 @@ struct LockerView: View {
                             catalog
                         }
                     }
-                    lockNote
+                    shopBar
                 }
                 .padding(16)
             }
@@ -55,6 +56,7 @@ struct LockerView: View {
         if landscape {
             HStack(spacing: 10) {
                 title
+                CoinPill(coins: career.profile.coins)
                 Spacer()
                 sideTabs.frame(width: 190)
                 done
@@ -64,6 +66,7 @@ struct LockerView: View {
                 HStack {
                     title
                     Spacer()
+                    CoinPill(coins: career.profile.coins)
                     done
                 }
                 sideTabs
@@ -142,7 +145,7 @@ struct LockerView: View {
     private func tile(_ item: Accessory?, slot: AccessorySlot) -> some View {
         let shown = settings.effectiveLoadout(side)[slot]
         let equipped = settings.loadout(side)[slot]
-        let locked = item.map { !settings.unlocks.isUnlocked($0) } ?? false
+        let locked = item.map { !career.profile.owns($0) } ?? false
         return ItemTile(item: item, isShown: shown == item?.id, isEquipped: equipped == item?.id, locked: locked) {
             feedback.tap()
             if locked, let item {
@@ -156,25 +159,50 @@ struct LockerView: View {
         }
     }
 
-    @ViewBuilder private var lockNote: some View {
+    /// Shown while trying on an item you don't own: buy it with coins, or see how to get it.
+    @ViewBuilder private var shopBar: some View {
         if let preview = settings.preview, preview.side == side,
-           let item = preview.loadout.ids.compactMap(Accessory.with(id:)).first(where: { !settings.unlocks.isUnlocked($0) }) {
-            Text(lockText(item))
-                .font(.system(.subheadline, design: .rounded, weight: .heavy))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14).padding(.vertical, 7)
-                .background(PuffySurface(shape: Capsule(), color: .purple, depth: 4))
-                .padding(.bottom, 4)
+           let item = preview.loadout.ids.compactMap(Accessory.with(id:)).first(where: { !career.profile.owns($0) }) {
+            HStack(spacing: 12) {
+                switch item.unlock {
+                case .coins(let price):
+                    let short = price - career.profile.coins
+                    Text(short > 0 ? "\(item.name) · \(short) more coins needed" : "Make \(item.name) yours?")
+                        .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                        .foregroundStyle(PuffyPalette.ink)
+                    Button {
+                        buy(item)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("Buy")
+                            CoinIcon(size: 20)
+                            Text("\(price)")
+                        }
+                        .font(.system(.headline, design: .rounded, weight: .black))
+                        .padding(.horizontal, 16).padding(.vertical, 9)
+                    }
+                    .buttonStyle(.puffy(short > 0 ? Color(white: 0.7) : .green))
+                    .disabled(short > 0)
+                case .premium:
+                    Text("\(item.name) is a premium item · coming soon")
+                        .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14).padding(.vertical, 7)
+                        .background(PuffySurface(shape: Capsule(), color: .pink, depth: 4))
+                        .padding(.bottom, 4)
+                case .free:
+                    EmptyView()
+                }
+            }
         }
     }
 
-    private func lockText(_ item: Accessory) -> String {
-        switch item.unlock {
-        case .free: return ""
-        case .level(let n): return "Trying on \(item.name) · unlocks at level \(n)"
-        case .premium: return "Trying on \(item.name) · premium item"
-        case .seasonal: return "Trying on \(item.name) · free every October"
-        }
+    private func buy(_ item: Accessory) {
+        guard career.profile.buy(item) else { return }
+        feedback.play("point")
+        settings.loadouts[side.rawValue][item.slot] = item.id
+        settings.preview = nil
+        career.checkAchievements()
     }
 }
 
@@ -220,19 +248,20 @@ private struct LockBadge: View {
     let unlock: Unlock
 
     var body: some View {
-        let (text, color): (String, Color) = switch unlock {
-        case .level(let n): ("Lv \(n)", .purple)
-        case .premium: ("★", .pink)
-        case .seasonal: ("🎃 Oct", .orange)
-        case .free: ("", .clear)
-        }
         HStack(spacing: 3) {
-            Image(systemName: "lock.fill").font(.system(size: 9, weight: .black))
-            Text(text).font(.system(size: 11, weight: .black, design: .rounded))
+            switch unlock {
+            case .coins(let price):
+                CoinIcon(size: 13)
+                Text("\(price)").font(.system(size: 11, weight: .black, design: .rounded))
+            case .premium:
+                Image(systemName: "star.fill").font(.system(size: 10, weight: .black))
+            case .free:
+                EmptyView()
+            }
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 7).padding(.vertical, 3)
-        .background(color.gradient, in: Capsule())
+        .background((unlock == .premium ? Color.pink : PuffyPalette.ink).gradient, in: Capsule())
         .overlay(Capsule().stroke(.white, lineWidth: 2))
         .allowsHitTesting(false)
     }

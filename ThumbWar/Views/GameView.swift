@@ -18,12 +18,15 @@ struct GameView: View {
     @State private var feedback: GameFeedback
     @State private var showSettings = false
     @State private var showLocker = false
+    @State private var showTrophies = false
+    @State private var career: Career
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let settings = GameSettings()
         _settings = State(initialValue: settings)
         _feedback = State(initialValue: GameFeedback(settings: settings))
+        _career = State(initialValue: Career(profile: Profile(), gameCenter: GameCenter()))
     }
 
     var body: some View {
@@ -40,7 +43,15 @@ struct GameView: View {
 
                 if game.stage == .menu {
                     MenuView(game: game, settings: settings, feedback: feedback,
-                             showSettings: $showSettings, showLocker: $showLocker)
+                             showSettings: $showSettings, showLocker: $showLocker, showTrophies: $showTrophies)
+                }
+                if career.showTour {
+                    TourView(game: game, settings: settings, feedback: feedback)
+                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                }
+                if showTrophies {
+                    TrophiesView(feedback: feedback) { showTrophies = false }
+                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
                 }
                 if game.isPaused {
                     PauseMenu(game: game, settings: settings, feedback: feedback, showSettings: $showSettings)
@@ -56,13 +67,23 @@ struct GameView: View {
             }
             .animation(.spring(duration: 0.3, bounce: 0.3), value: showSettings)
             .animation(.spring(duration: 0.3, bounce: 0.3), value: showLocker)
+            .animation(.spring(duration: 0.3, bounce: 0.3), value: showTrophies)
+            .animation(.spring(duration: 0.3, bounce: 0.3), value: career.showTour)
+            .overlay { ToastStack(toasts: career.toasts) }
             // A fixed frame: an oversized banner can never widen the layout and shift the camera.
             .frame(width: geo.size.width, height: geo.size.height)
         }
+        .environment(career)
         .onAppear {
+            settings.removeUnowned(career.profile.owns)
             AccessoryLibrary.shared.load(settings.loadouts.flatMap(\.ids))
-            game.onEvent = { [feedback, weak game] event in
-                feedback.handle(event, mode: game?.mode ?? .vsCPU)
+            career.connect()
+            game.onEvent = { [feedback, career, settings, weak game] event in
+                guard let game else { return }
+                feedback.handle(event, mode: game.mode)
+                if case .matchOver(let winner) = event {
+                    career.matchFinished(game: game, winner: winner, settings: settings)
+                }
             }
             #if DEBUG
             if let forced = UserDefaults.standard.string(forKey: "debugOrientation"),
@@ -71,10 +92,15 @@ struct GameView: View {
             }
             if ProcessInfo.processInfo.arguments.contains("-openSettings") { showSettings = true }
             if ProcessInfo.processInfo.arguments.contains("-openLocker") { showLocker = true }
+            if ProcessInfo.processInfo.arguments.contains("-openTour") { career.showTour = true }
+            if ProcessInfo.processInfo.arguments.contains("-openTrophies") { showTrophies = true }
             if ProcessInfo.processInfo.arguments.contains("-autostartCPU") {
-                game.start(mode: .vsCPU, length: settings.matchLength)
+                career.playQuick(.vsCPU, game: game, settings: settings)
             } else if ProcessInfo.processInfo.arguments.contains("-autostart2P") {
-                game.start(mode: .twoPlayers, length: settings.matchLength)
+                career.playQuick(.twoPlayers, game: game, settings: settings)
+            } else if let id = Int(UserDefaults.standard.string(forKey: "debugChallenge") ?? ""),
+                      let challenge = Challenge.all.first(where: { $0.id == id }) {
+                career.play(challenge, game: game, settings: settings)
             }
             #endif
         }
