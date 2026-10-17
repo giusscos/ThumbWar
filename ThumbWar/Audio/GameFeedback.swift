@@ -74,6 +74,10 @@ final class GameFeedback {
         case .mash:
             play("mash", volume: 0.6, pitchJitter: 0.15)
             haptic { self.light.impactOccurred(intensity: 0.4) }
+        case .reversal:
+            play("escape")
+            play("pin", volume: 0.8)
+            haptic { self.heavy.impactOccurred() }
         case .escape:
             play("escape")
             haptic { self.notify.notificationOccurred(.warning) }

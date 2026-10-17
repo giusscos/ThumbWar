@@ -20,6 +20,21 @@ extension ThumbWarGame {
     }
 }
 
+/// The slam button wired to one player: tap to slam, hold to hook, mash during pins.
+struct PlayerSlamButton: View {
+    let game: ThumbWarGame
+    let side: Side
+    var size: CGFloat = 96
+
+    var body: some View {
+        let title = game.isMashing ? "MASH!" : (game.thumb(side).isHooking ? "HOOK" : "SLAM")
+        SlamButton(side: side, title: title, enabled: game.canSlam(side) || game.thumb(side).phase == .down,
+                   pulse: game.isMashing, size: size,
+                   action: { game.slamPressed(side) },
+                   release: { game.slamReleased(side) })
+    }
+}
+
 // MARK: - Layout HUDs
 
 struct LandscapeHUD: View {
@@ -62,7 +77,7 @@ struct LandscapeHUD: View {
     }
 
     private func slam(_ side: Side) -> some View {
-        SlamButton(side: side, enabled: game.canSlam(side), mashing: game.isMashing) { game.slamPressed(side) }
+        PlayerSlamButton(game: game, side: side)
     }
 }
 
@@ -88,9 +103,7 @@ struct PortraitHUD: View {
                     StaminaBar(value: game.stamina[0], side: .left)
                     Spacer()
                     if settings.slamControl == .button && game.isPlaying {
-                        SlamButton(side: .left, enabled: game.canSlam(.left), mashing: game.isMashing, size: 104) {
-                            game.slamPressed(.left)
-                        }
+                        PlayerSlamButton(game: game, side: .left, size: 104)
                     }
                 }
             }
@@ -125,9 +138,7 @@ struct PlayerHalfHUD: View {
                     }
                     Spacer()
                     if settings.slamControl == .button && game.isPlaying {
-                        SlamButton(side: viewer, enabled: game.canSlam(viewer), mashing: game.isMashing, size: 92) {
-                            game.slamPressed(viewer)
-                        }
+                        PlayerSlamButton(game: game, side: viewer, size: 92)
                     }
                 }
             }
@@ -151,19 +162,29 @@ struct StageBanner: View {
     var body: some View {
         switch game.stage {
         case .chant(let beat):
-            PuffyPop(text: ThumbWarGame.chantWords[beat], size: (beat < 3 ? 130 : 88) * scale, color: chantColor(beat))
+            fittingPop(ThumbWarGame.chantWords[beat], size: (beat < 3 ? 130 : 88) * scale, color: chantColor(beat))
                 .id(beat)
                 .allowsHitTesting(false)
         case .pinned(let pinner):
             pin(pinner).allowsHitTesting(false)
         case .roundOver(let winner):
-            PuffyPop(text: "+1 \(game.label(winner, viewer: viewer))!", size: 60 * scale, color: PuffyPalette.team(winner))
+            fittingPop("+1 \(game.label(winner, viewer: viewer))!", size: 60 * scale, color: PuffyPalette.team(winner))
                 .allowsHitTesting(false)
         case .matchOver(let winner):
             result(winner)
         case .menu, .fight:
             EmptyView()
         }
+    }
+
+    /// Big puffy text that shrinks, then wraps, rather than spilling off narrow screens.
+    private func fittingPop(_ text: String, size: CGFloat, color: Color) -> some View {
+        ViewThatFits(in: .horizontal) {
+            PuffyPop(text: text, size: size, color: color)
+            PuffyPop(text: text, size: size * 0.75, color: color)
+            PuffyPop(text: text.replacingOccurrences(of: " ", with: "\n"), size: size * 0.75, color: color)
+        }
+        .padding(.horizontal, 16)
     }
 
     private func chantColor(_ beat: Int) -> Color {
@@ -174,11 +195,13 @@ struct StageBanner: View {
         let pinned = pinner.opponent
         let count = min(3, Int(game.pinProgress * 3) + 1)
         let mash = settings.slamControl == .button
+        let flip = game.pinIsReversible
+        let escapeVerb = flip ? "flip them" : "escape"
         let line: String = switch viewer {
-        case pinned?: mash ? "MASH to escape!" : "Wiggle to escape!"
-        case pinner?: mash ? "MASH to hold!" : "Hold it!"
-        default: mash ? "\(game.label(pinned)): MASH to escape! · \(game.label(pinner)): MASH to hold!"
-                      : "\(game.label(pinned)), wiggle to escape!"
+        case pinned?: mash ? "MASH to \(escapeVerb)!" : "Wiggle to \(escapeVerb)!"
+        case pinner?: mash ? (flip ? "It's a hook! MASH to hold!" : "MASH to hold!") : "Hold it!"
+        default: mash ? "\(game.label(pinned)): MASH to \(escapeVerb)! · \(game.label(pinner)): MASH to hold!"
+                      : "\(game.label(pinned)), wiggle to \(escapeVerb)!"
         }
         return VStack(spacing: 6) {
             PuffyPop(text: "\(count)", size: 72 * scale, color: PuffyPalette.team(pinner))
@@ -196,19 +219,20 @@ struct StageBanner: View {
     }
 
     private func result(_ winner: Side?) -> some View {
-        let title: String = {
-            guard let winner else { return "Draw!" }
-            if game.mode == .vsCPU { return winner == .left ? "You win!" : "You lose!" }
-            if let viewer { return winner == viewer ? "You win!" : "You lose!" }
-            return "\(winner.name) wins!"
+        // Personal results read as win/lose; a shared screen names the winner.
+        let me: Side? = game.mode == .vsCPU ? .left : viewer
+        let (title, color): (String, Color) = {
+            guard let winner else { return ("Draw!", .purple) }
+            if let me { return winner == me ? ("You win!", .orange) : ("You lose!", PuffyPalette.red) }
+            return ("\(winner.name) wins!", PuffyPalette.team(winner))
         }()
         return VStack(spacing: 12) {
-            PuffyPop(text: title, size: 68 * scale, color: winner.map(PuffyPalette.team) ?? .yellow)
-            Text("\(game.label(.left, viewer: viewer)) \(game.scores[0])  –  \(game.scores[1]) \(game.label(.right, viewer: viewer))")
-                .font(.system(compact ? .headline : .title2, design: .rounded, weight: .heavy))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16).padding(.vertical, 6)
-                .background(.black.opacity(0.3), in: Capsule())
+            fittingPop(title, size: 68 * scale, color: color)
+            HStack(spacing: 10) {
+                ScorePill(side: .left, score: game.scores[0], label: game.label(.left, viewer: viewer), large: !compact)
+                PuffyText(text: "–", size: compact ? 26 : 34, color: .orange)
+                ScorePill(side: .right, score: game.scores[1], label: game.label(.right, viewer: viewer), large: !compact)
+            }
             HStack(spacing: 14) {
                 PuffyButton(title: "Rematch", color: PuffyPalette.blue, compact: compact) {
                     feedback.tap()
@@ -230,6 +254,8 @@ struct MenuView: View {
     let settings: GameSettings
     let feedback: GameFeedback
     @Binding var showSettings: Bool
+    @Binding var showLocker: Bool
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -238,7 +264,8 @@ struct MenuView: View {
                     PuffyText(text: "THUMB WAR", size: 60, color: .orange)
                     PuffyText(text: "THUMB WAR", size: 44, color: .orange)
                 }
-                .padding(.top, 50)
+                // Clear of the corner buttons in portrait; landscape keeps it off the thumbs.
+                .padding(.top, verticalSizeClass == .compact ? 8 : 96)
                 Spacer()
                 HStack(spacing: 14) {
                     PuffyButton(title: "Play vs CPU", color: PuffyPalette.blue) {
@@ -254,9 +281,22 @@ struct MenuView: View {
             .frame(maxWidth: .infinity)
             .padding(.bottom, 20)
 
-            RoundIconButton(systemName: "gearshape.fill", color: .purple) {
-                feedback.tap()
-                showSettings = true
+            HStack {
+                Button {
+                    feedback.tap()
+                    showLocker = true
+                } label: {
+                    Label("Locker", systemImage: "tshirt.fill")
+                        .font(.system(.headline, design: .rounded, weight: .heavy))
+                        .padding(.horizontal, 14)
+                        .frame(height: 44)
+                }
+                .buttonStyle(.puffy(.pink))
+                Spacer()
+                RoundIconButton(systemName: "gearshape.fill", color: .purple) {
+                    feedback.tap()
+                    showSettings = true
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
@@ -331,7 +371,7 @@ struct HintPill: View {
 
     var body: some View {
         if game.stage == .fight {
-            Text(settings.slamControl == .lift ? "Drag to move · Lift to slam" : "Drag to move · Tap SLAM")
+            Text(settings.slamControl == .lift ? "Drag to move · Lift to slam" : "Drag · Tap SLAM · Hold to hook")
                 .font(.system(.footnote, design: .rounded, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.9))
                 .padding(.horizontal, 12).padding(.vertical, 6)
@@ -345,19 +385,24 @@ struct ScorePill: View {
     let side: Side
     let score: Int
     let label: String
+    var large = false
 
     var body: some View {
+        let depth: CGFloat = large ? 6 : 4
         HStack(spacing: 8) {
-            Text(label).font(.system(.headline, design: .rounded, weight: .heavy))
+            Text(label).font(.system(large ? .title3 : .headline, design: .rounded, weight: .heavy))
             Text("\(score)")
-                .font(.system(.title3, design: .rounded, weight: .black))
+                .font(.system(large ? .title : .title3, design: .rounded, weight: .black))
                 .contentTransition(.numericText())
                 .animation(.spring, value: score)
         }
+        .lineLimit(1)
+        .fixedSize()
         .foregroundStyle(.white)
-        .padding(.horizontal, 14).padding(.vertical, 7)
-        .background(PuffySurface(shape: Capsule(), color: PuffyPalette.team(side), depth: 4))
-        .padding(.bottom, 4)
+        .shadow(color: .black.opacity(0.18), radius: 0, y: 1.5)
+        .padding(.horizontal, large ? 18 : 14).padding(.vertical, large ? 9 : 7)
+        .background(PuffySurface(shape: Capsule(), color: PuffyPalette.team(side), depth: depth))
+        .padding(.bottom, depth)
         .allowsHitTesting(false)
     }
 }
@@ -371,6 +416,8 @@ struct TimerPill: View {
         Text(overtime ? "OVERTIME" : String(format: "%d:%02d", seconds / 60, seconds % 60))
             .font(.system(.title3, design: .rounded, weight: .black))
             .monospacedDigit()
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(.white)
             .padding(.horizontal, 14).padding(.vertical, 7)
             .background(PuffySurface(shape: Capsule(), color: urgent ? .red : .gray, depth: 4))
@@ -381,15 +428,16 @@ struct TimerPill: View {
     }
 }
 
-/// Escape meter during a pin: fills with the pinned player's color.
+/// Pin tug-of-war: starts in the middle. The pinned player's color pushes
+/// right; past the middle when the count ends (or all the way) means escape.
 struct TugBar: View {
     let progress: Float
     let escaper: Side
 
     var body: some View {
         Capsule()
-            .fill(PuffyPalette.team(escaper.opponent).opacity(0.85))
-            .frame(height: 16)
+            .fill(PuffyPalette.team(escaper.opponent))
+            .frame(height: 18)
             .overlay(alignment: .leading) {
                 GeometryReader { geo in
                     Capsule()
@@ -398,6 +446,7 @@ struct TugBar: View {
                         .animation(.spring(duration: 0.15), value: progress)
                 }
             }
+            .overlay { Rectangle().fill(.white).frame(width: 3, height: 26) }
             .overlay(Capsule().stroke(.white, lineWidth: 3))
     }
 }

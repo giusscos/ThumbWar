@@ -38,12 +38,35 @@ enum MatchLength: String, CaseIterable, Identifiable {
     }
 }
 
+enum CPULevel: String, CaseIterable, Identifiable {
+    case easy, normal, hard
+
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+}
+
 @Observable
 final class GameSettings {
     var slamControl: SlamControl { didSet { defaults.set(slamControl.rawValue, forKey: Keys.slamControl) } }
     var matchLength: MatchLength { didSet { defaults.set(matchLength.rawValue, forKey: Keys.matchLength) } }
     var soundOn: Bool { didSet { defaults.set(soundOn, forKey: Keys.soundOn) } }
     var hapticsOn: Bool { didSet { defaults.set(hapticsOn, forKey: Keys.hapticsOn) } }
+    var cpuLevel: CPULevel { didSet { defaults.set(cpuLevel.rawValue, forKey: Keys.cpuLevel) } }
+    /// What each thumb wears, indexed by `Side.rawValue`.
+    var loadouts: [Loadout] {
+        didSet { defaults.set(try? JSONEncoder().encode(loadouts), forKey: Keys.loadouts) }
+    }
+    var unlocks = Unlocks()
+    /// A try-on from the Locker (e.g. a locked item). Not saved.
+    var preview: (side: Side, loadout: Loadout)?
+
+    func loadout(_ side: Side) -> Loadout { loadouts[side.rawValue] }
+
+    /// What the thumb should show right now: the try-on if there is one.
+    func effectiveLoadout(_ side: Side) -> Loadout {
+        if let preview, preview.side == side { return preview.loadout }
+        return loadouts[side.rawValue]
+    }
 
     @ObservationIgnored private let defaults: UserDefaults
 
@@ -52,6 +75,8 @@ final class GameSettings {
         static let matchLength = "settings.matchLength"
         static let soundOn = "settings.soundOn"
         static let hapticsOn = "settings.hapticsOn"
+        static let cpuLevel = "settings.cpuLevel"
+        static let loadouts = "settings.loadouts"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -60,5 +85,19 @@ final class GameSettings {
         matchLength = defaults.string(forKey: Keys.matchLength).flatMap(MatchLength.init) ?? .seconds60
         soundOn = defaults.object(forKey: Keys.soundOn) as? Bool ?? true
         hapticsOn = defaults.object(forKey: Keys.hapticsOn) as? Bool ?? true
+        cpuLevel = defaults.string(forKey: Keys.cpuLevel).flatMap(CPULevel.init) ?? .normal
+        loadouts = defaults.data(forKey: Keys.loadouts)
+            .flatMap { try? JSONDecoder().decode([Loadout].self, from: $0) }
+            .flatMap { $0.count == 2 ? $0 : nil }
+            ?? [Loadout(hat: "cap"), Loadout(hat: "party")]
+        // Take off anything that is no longer unlocked (catalog changes, season ended).
+        let owned = unlocks
+        loadouts = loadouts.map { loadout in
+            var kept = loadout
+            for slot in AccessorySlot.allCases {
+                if let item = Accessory.with(id: loadout[slot]), !owned.isUnlocked(item) { kept[slot] = nil }
+            }
+            return kept
+        }
     }
 }

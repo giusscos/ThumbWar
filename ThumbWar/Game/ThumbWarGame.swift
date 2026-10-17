@@ -33,7 +33,12 @@ enum Arena {
     static let pinDuration: Float = 3
     static let missRecovery: Float = 0.35
     static let exhaustedRecovery: Float = 1.2
-    static let escapeDistance: Float = 0.45  // meters of wiggling needed to break a pin
+    static let escapeDistance: Float = 0.45  // meters of wiggling that push the escape bar end to end
+    /// Pins are a tug-of-war that starts in the middle; the pin itself keeps
+    /// pulling toward the pinner. Lift mode pulls harder since the pinner can't mash back.
+    static let pinPullButton: Float = 0.06
+    static let pinPullLift: Float = 0.2
+    static let mashPush: Float = 0.07
 
     /// A slam leaps onto the opponent when they are this close and roughly
     /// in the direction the thumb is moving (or facing).
@@ -89,6 +94,10 @@ struct ThumbState {
     /// Where a jumping slam is headed, if this slam is a leap onto the opponent.
     var lunge: SIMD2<Float>?
     var slamTime: Float = 0
+    /// Slam button held down: a landed thumb stays down as a hook.
+    var slamHeld = false
+
+    var isHooking: Bool { phase == .down && slamHeld }
 
     var horizontal: SIMD2<Float> { SIMD2(tip.x, tip.z) }
     var isTired: Bool { stamina < Stamina.tired }
@@ -98,7 +107,7 @@ enum GameEvent {
     case chantBeat(Int)
     case slam, lunge, land, tired
     case bump(Float)
-    case pin, pinTick(Int), mash, escape
+    case pin, pinTick(Int), mash, escape, reversal
     case point(Side)
     case timeTick
     case matchOver(winner: Side?)
@@ -124,10 +133,13 @@ final class ThumbWarGame {
     /// Whole seconds left, nil in "first to 3" matches.
     private(set) var secondsLeft: Int?
     private(set) var isOvertime = false
+    /// The pinned thumb was hooking: winning the tug flips the pin instead of just escaping.
+    private(set) var pinIsReversible = false
     private(set) var matchLength: MatchLength = .seconds60
     var isPaused = false
 
     @ObservationIgnored var slamControl: SlamControl = .lift
+    @ObservationIgnored var cpuLevel: CPULevel = .normal
     @ObservationIgnored private(set) var thumbs: [ThumbState]
     @ObservationIgnored var onEvent: (GameEvent) -> Void = { _ in }
     @ObservationIgnored private(set) var time: Float = 0
@@ -223,8 +235,10 @@ final class ThumbWarGame {
     func touchMoved(_ side: Side, delta: SIMD2<Float>) {
         guard !isPaused else { return }
         let i = side.rawValue
+        // With the slam button, pins are decided by mashing alone: dragging does nothing.
+        if control(for: side) == .button, thumbs[i].phase == .pinned || thumbs[i].phase == .pinning { return }
         if thumbs[i].phase == .pinned {
-            escapeProgress += length(delta) / Arena.escapeDistance * Stamina.power(thumbs[i].stamina)
+            escapeProgress = min(1, escapeProgress + length(delta) / Arena.escapeDistance * Stamina.power(thumbs[i].stamina))
             return
         }
         recordAim(i, delta)
@@ -239,20 +253,22 @@ final class ThumbWarGame {
     func slamPressed(_ side: Side) {
         guard !isPaused else { return }
         let i = side.rawValue
+        if control(for: side) == .button { thumbs[i].slamHeld = true }
         if case .pinned(let pinner) = stage {
             guard thumbs[i].stamina > 0 else { return }
             let power = Stamina.power(thumbs[i].stamina)
             thumbs[i].stamina = max(0, thumbs[i].stamina - Stamina.mashCost)
-            if side == pinner {
-                escapeProgress = max(0, escapeProgress - 0.06 * power)
-            } else {
-                escapeProgress += 0.09 * power
-            }
+            let push = (side == pinner ? -1 : 1) * Arena.mashPush * power
+            escapeProgress = min(1, max(0, escapeProgress + push))
             onEvent(.mash)
             return
         }
         guard stage == .fight, thumbs[i].phase == .raised, thumbs[i].stamina >= Stamina.slamCost else { return }
         slam(side)
+    }
+
+    func slamReleased(_ side: Side) {
+        thumbs[side.rawValue].slamHeld = false
     }
 
     // MARK: - Simulation
@@ -296,7 +312,13 @@ final class ThumbWarGame {
                 lastPinTick = tickIndex
                 onEvent(.pinTick(tickIndex + 1))
             }
-            if escapeProgress >= 1 {
+            let pull = slamControl == .button ? Arena.pinPullButton : Arena.pinPullLift
+            escapeProgress = max(0, escapeProgress - pull * dt)
+            // All the way across escapes at once; otherwise the middle line decides at "3".
+            let escaped = escapeProgress >= 1 || (pinProgress >= 1 && escapeProgress > 0.5)
+            if escaped && pinIsReversible {
+                reversePin(oldPinner: pinner)
+            } else if escaped {
                 escapePin(pinner: pinner)
                 if isOvertime { endMatch() }
             } else if pinProgress >= 1 {
@@ -432,7 +454,8 @@ final class ThumbWarGame {
                     thumbs[i].exhausted = false
                     thumbs[opp].phase = .pinned
                     thumbs[opp].velocity = .zero
-                    escapeProgress = 0
+                    pinIsReversible = them.isHooking
+                    escapeProgress = 0.5
                     pinProgress = 0
                     lastPinTick = -1
                     setStage(.pinned(by: side))
@@ -447,7 +470,7 @@ final class ThumbWarGame {
                 thumbs[i].stamina = min(1, thumbs[i].stamina + Stamina.regenDown * dt)
                 thumbs[i].recover -= dt
                 let needed: Float = thumbs[i].exhausted ? Stamina.raiseAfterExhaustion : 0.05
-                let wantsUp = control(for: side) == .lift ? thumbs[i].isTouching : true
+                let wantsUp = control(for: side) == .lift ? thumbs[i].isTouching : !thumbs[i].slamHeld
                 if thumbs[i].recover <= 0 && wantsUp && thumbs[i].stamina >= needed && stage == .fight {
                     thumbs[i].phase = .raised
                     thumbs[i].exhausted = false
@@ -467,6 +490,23 @@ final class ThumbWarGame {
         thumbs[pinner.opponent.rawValue].phase = .down
         thumbs[pinner.opponent.rawValue].recover = 0.2
         setStage(.fight)
+    }
+
+    /// The hooked thumb won the tug: it rolls over on top and starts its own pin.
+    private func reversePin(oldPinner: Side) {
+        let flipper = oldPinner.opponent
+        let f = flipper.rawValue, o = oldPinner.rawValue
+        thumbs[f].phase = .pinning
+        thumbs[f].slamHeld = false
+        thumbs[f].velocity.y += 0.8
+        thumbs[o].phase = .pinned
+        thumbs[o].velocity = .zero
+        pinIsReversible = false
+        escapeProgress = 0.5
+        pinProgress = 0
+        lastPinTick = -1
+        setStage(.pinned(by: flipper))
+        onEvent(.reversal)
     }
 
     private func escapePin(pinner: Side) {
@@ -561,6 +601,10 @@ final class ThumbWarGame {
 
     // MARK: - CPU hooks
 
+    fileprivate func cpuSetHook(_ on: Bool) {
+        thumbs[1].slamHeld = on
+    }
+
     fileprivate func cpuSetTarget(_ p: SIMD2<Float>) {
         let clamped = Arena.clamp(p, for: .right)
         recordAim(1, clamped - thumbs[1].target)
@@ -568,21 +612,49 @@ final class ThumbWarGame {
     }
 }
 
+/// How the CPU plays at each difficulty.
+private struct CPUProfile {
+    var reaction: Float           // delay before punishing a downed thumb
+    var attackRate: Float         // jumping-slam attempts per second when in range
+    var dodgeChance: Float        // chance to dodge each incoming slam
+    var struggle: ClosedRange<Float>   // wiggle strength when pinned (lift mode)
+    var mashInterval: ClosedRange<Float>
+    var aimError: Float           // meters of slop when lining up a slam
+    var hooks: Bool               // rests in a hook, ready to flip a pin
+
+    static func of(_ level: CPULevel) -> CPUProfile {
+        switch level {
+        case .easy:
+            CPUProfile(reaction: 0.35, attackRate: 0.35, dodgeChance: 0.3, struggle: 0.06...0.16,
+                       mashInterval: 0.3...0.45, aimError: 0.012, hooks: false)
+        case .normal:
+            CPUProfile(reaction: 0.12, attackRate: 0.9, dodgeChance: 0.7, struggle: 0.12...0.3,
+                       mashInterval: 0.17...0.32, aimError: 0.004, hooks: false)
+        case .hard:
+            CPUProfile(reaction: 0.06, attackRate: 1.6, dodgeChance: 0.95, struggle: 0.25...0.4,
+                       mashInterval: 0.1...0.18, aimError: 0, hooks: true)
+        }
+    }
+}
+
 /// A simple opponent that controls the right thumb with "lift" rules.
 private struct CPUBrain {
     var reaction: Float = 0
     var orbitAngle: Float = .random(in: 0...(2 * .pi))
-    var struggleRate: Float = .random(in: 0.22...0.42)
     var mashTimer: Float = 0
     var wantsToRest = false
+    var dodging: Bool?            // decided once per incoming slam
+    var aimOffset: SIMD2<Float> = .zero
 
     mutating func think(game: ThumbWarGame, dt: Float) {
+        let profile = CPUProfile.of(game.cpuLevel)
         let me = game.thumb(.right), them = game.thumb(.left)
         let humanMashes = game.control(for: .left) == .button
 
         switch game.stage {
         case .fight, .pinned: break
         default:
+            game.cpuSetHook(false)
             game.touchBegan(.right)
             return
         }
@@ -590,43 +662,54 @@ private struct CPUBrain {
         switch me.phase {
         case .pinned:
             if humanMashes {
-                mash(game: game, dt: dt, interval: 0.17...0.32)
+                mash(game: game, dt: dt, interval: profile.mashInterval)
             } else {
                 let wiggle = SIMD2<Float>(cos(orbitAngle * 7), sin(orbitAngle * 5))
                 orbitAngle += dt * 9
-                game.touchMoved(.right, delta: wiggle * struggleRate * Arena.escapeDistance * dt)
+                let strength = Float.random(in: profile.struggle)
+                game.touchMoved(.right, delta: wiggle * strength * Arena.escapeDistance * dt)
             }
             return
         case .pinning:
             game.touchEnded(.right)
-            if humanMashes { mash(game: game, dt: dt, interval: 0.2...0.35) }
+            if humanMashes { mash(game: game, dt: dt, interval: profile.mashInterval) }
             return
         case .down:
             wantsToRest = false
-            if me.stamina > 0.5 { game.touchBegan(.right) }
+            // Hard CPU lies in wait as a hook while it recovers.
+            let hookUp = profile.hooks && me.stamina < 0.85 && distance(me.horizontal, them.horizontal) < 0.08
+            game.cpuSetHook(hookUp)
+            if me.stamina > 0.5 && !hookUp { game.touchBegan(.right) }
             return
         case .slamming:
             return
         case .raised:
-            break
+            game.cpuSetHook(false)
         }
 
         let gap = distance(me.horizontal, them.horizontal)
 
-        // Dodge an incoming slam.
+        // Dodge an incoming slam (decided once per slam).
         if them.phase == .slamming && gap < 0.06 {
-            let away = normalize(me.horizontal - them.horizontal + [0.001, 0])
-            game.cpuSetTarget(me.horizontal + away * 0.06)
-            return
+            if dodging == nil { dodging = Float.random(in: 0...1) < profile.dodgeChance }
+            if dodging == true {
+                let away = normalize(me.horizontal - them.horizontal + [0.001, 0])
+                game.cpuSetTarget(me.horizontal + away * 0.06)
+                return
+            }
+        } else {
+            dodging = nil
         }
 
-        // Punish a thumb that is down.
-        if them.phase == .down && me.stamina >= Stamina.slamCost {
-            game.cpuSetTarget(them.horizontal)
-            if gap < 0.014 {
+        // Punish a thumb that is down. Hooked thumbs are a trap: only hard CPU avoids them.
+        let avoidHook = them.isHooking && profile.hooks
+        if them.phase == .down && me.stamina >= Stamina.slamCost && !avoidHook {
+            game.cpuSetTarget(them.horizontal + aimOffset)
+            if gap < 0.014 + profile.aimError {
                 reaction += dt
-                if reaction > 0.12 {
+                if reaction > profile.reaction {
                     reaction = 0
+                    aimOffset = SIMD2(.random(in: -1...1), .random(in: -1...1)) * profile.aimError
                     game.touchEnded(.right)
                 }
             }
@@ -636,7 +719,9 @@ private struct CPUBrain {
 
         // Opponent hovering close in front: sometimes go for a jumping slam.
         let ahead = gap > 0.001 && dot((them.horizontal - me.horizontal) / gap, Arena.facing(.right)) > Arena.lungeCone
-        if gap < 0.075, ahead, me.stamina > 0.55, Float.random(in: 0...1) < dt * 0.9 {
+        if gap < 0.075, ahead, me.stamina > 0.55, them.phase == .raised,
+           Float.random(in: 0...1) < dt * profile.attackRate {
+            game.cpuSetTarget(them.horizontal)  // turn toward them so the slam becomes a leap
             game.touchEnded(.right)
             return
         }

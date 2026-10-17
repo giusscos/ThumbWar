@@ -48,7 +48,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 18) {
                             section("Slam with", footer: settings.slamControl == .lift
                                     ? "Drag to move, lift your finger to slam. Pinned? Wiggle to escape."
-                                    : "Drag to move, tap SLAM. During a pin both players mash: one to escape, one to hold!") {
+                                    : "Drag to move, tap SLAM. Hold SLAM to stay down as a hook: if they pin your hook, mash to flip them!") {
                                 HStack(spacing: 10) {
                                     ForEach(SlamControl.allCases) { option in
                                         PuffyChip(title: option.title,
@@ -69,6 +69,19 @@ struct SettingsView: View {
                                         PuffyChip(title: option.title, selected: settings.matchLength == option) {
                                             feedback.tap()
                                             settings.matchLength = option
+                                        }
+                                    }
+                                }
+                            }
+
+                            section("CPU level", footer: settings.cpuLevel == .hard
+                                    ? "Fast, dodges almost everything, and sets hooks."
+                                    : (settings.cpuLevel == .easy ? "Slow and forgiving. Good for learning." : "A fair fight.")) {
+                                HStack(spacing: 8) {
+                                    ForEach(CPULevel.allCases) { level in
+                                        PuffyChip(title: level.title, selected: settings.cpuLevel == level) {
+                                            feedback.tap()
+                                            settings.cpuLevel = level
                                         }
                                     }
                                 }

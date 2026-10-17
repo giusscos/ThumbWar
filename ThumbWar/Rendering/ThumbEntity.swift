@@ -19,6 +19,11 @@ final class ThumbEntity: Entity {
     private let headband: ModelEntity
     private let knot: ModelEntity
     private let face = Entity()
+    /// Accessories hang off this, scaled so the tip is a unit sphere.
+    private let head = Entity()
+    private var spinner: Entity?
+    private var spinAngle: Float = 0
+    private(set) var wearing: Loadout?
     private var eyes: [ModelEntity] = []
     private var pupils: [ModelEntity] = []
     private var brows: [ModelEntity] = []
@@ -52,6 +57,7 @@ final class ThumbEntity: Entity {
         addChild(headband)
         addChild(knot)
         addChild(face)
+        addChild(head)
         for x: Float in [-1, 1] {
             let eye = ModelEntity(mesh: .generateSphere(radius: 0.0052), materials: [white])
             eye.position = [x * 0.0068, 0.003, 0]
@@ -77,6 +83,16 @@ final class ThumbEntity: Entity {
     }
 
     @MainActor required init() { fatalError("use init(side:)") }
+
+    /// Swaps the worn accessories. Call once the library has the models loaded.
+    func wear(_ loadout: Loadout) {
+        head.children.removeAll()
+        for id in loadout.ids {
+            if let model = AccessoryLibrary.shared.make(id) { head.addChild(model) }
+        }
+        spinner = head.findEntity(named: "acc_propeller_spin")
+        wearing = loadout
+    }
 
     func update(state: ThumbState, opponentTip: SIMD3<Float>, cameraPosition: SIMD3<Float>,
                 mood: Mood, dt: Float) {
@@ -120,6 +136,14 @@ final class ThumbEntity: Entity {
         let s = cross(t, f)
         face.position = tip + t * (tipR * 0.2) + f * (tipR * 0.8)
         face.orientation = simd_quatf(simd_float3x3(columns: (s, t, f)))
+        head.position = tip
+        head.orientation = face.orientation
+        head.scale = SIMD3(repeating: tipR)
+        if let spinner {
+            // Parts keep Blender's local axes: the propeller spins around local Z.
+            spinAngle += dt * 14
+            spinner.orientation = simd_quatf(angle: spinAngle, axis: [0, 0, 1])
+        }
         knot.position = curve.point(bandS) - f * bandR
 
         // Pupils glance at the opponent.

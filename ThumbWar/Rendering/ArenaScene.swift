@@ -38,6 +38,12 @@ struct CameraRig: Equatable {
         return CameraRig(position: [-0.19 * s, 0.25, 0.15 * s], target: [0.012 * s, 0.128, 0.004 * s], fov: fov, horizontalFOV: true)
     }
 
+    /// Close-up on one thumb for the Locker preview.
+    static func locker(_ side: Side) -> CameraRig {
+        let x = Arena.startTargets[side.rawValue].x
+        return CameraRig(position: [x * 0.7, 0.215, 0.2], target: [x, 0.158, 0], fov: 34)
+    }
+
     /// Screen drag in points (y down) to world XZ meters.
     func worldDelta(dx: Float, dy: Float, scale: Float) -> SIMD2<Float> {
         var forward = target - position
@@ -57,6 +63,7 @@ final class ArenaScene {
     let drivesSimulation: Bool
     private var cameraPosition: SIMD3<Float> { rig.position }
     private var thumbs: [ThumbEntity] = []
+    private var settings: GameSettings?
     private var updateSubscription: EventSubscription?
 
     init(rig: CameraRig, drivesSimulation: Bool = true) {
@@ -69,7 +76,8 @@ final class ArenaScene {
         updateSubscription = nil
     }
 
-    func build(in content: RealityViewCameraContent, game: ThumbWarGame) throws {
+    func build(in content: RealityViewCameraContent, game: ThumbWarGame, settings: GameSettings) throws {
+        self.settings = settings
         root.addChild(makeBackdrop())
         root.addChild(makeFists())
 
@@ -114,6 +122,18 @@ final class ArenaScene {
     }
 
     private func sync(game: ThumbWarGame, dt: Float) {
+        // Dress the thumbs once the models are loaded, and whenever the loadout changes.
+        if let settings {
+            for side in Side.allCases {
+                let want = settings.effectiveLoadout(side)
+                guard thumbs[side.rawValue].wearing != want else { continue }
+                if AccessoryLibrary.shared.isReady(want) {
+                    thumbs[side.rawValue].wear(want)
+                } else {
+                    AccessoryLibrary.shared.load(want.ids)
+                }
+            }
+        }
         for side in Side.allCases {
             let me = game.thumb(side)
             let them = game.thumb(side.opponent)
@@ -139,6 +159,7 @@ final class ArenaScene {
             return .happy
         case .fight:
             let thumb = game.thumb(side)
+            if thumb.isHooking { return .fierce }
             return thumb.phase == .down || thumb.isTired ? .worried : .fierce
         }
     }

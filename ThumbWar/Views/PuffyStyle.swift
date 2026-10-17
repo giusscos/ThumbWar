@@ -129,18 +129,21 @@ struct PuffyChip: View {
     }
 }
 
-/// Fires on touch-down so it can be mashed as fast as fingers allow.
+/// Fires on touch-down so it can be mashed as fast as fingers allow,
+/// and reports the release so holding it can mean something.
 struct SlamButton: View {
     let side: Side
+    let title: String
     let enabled: Bool
-    let mashing: Bool
+    var pulse = false
     var size: CGFloat = 96
     let action: () -> Void
+    var release: () -> Void = {}
     @State private var pressed = false
 
     var body: some View {
         let depth: CGFloat = 8
-        Text(mashing ? "MASH!" : "SLAM")
+        Text(title)
             .font(.system(size: size * 0.23, weight: .black, design: .rounded))
             .foregroundStyle(.white)
             .shadow(color: .black.opacity(0.2), radius: 0, y: 2)
@@ -148,7 +151,7 @@ struct SlamButton: View {
             .offset(y: pressed ? depth * 0.75 : 0)
             .background(PuffySurface(shape: Circle(), color: PuffyPalette.team(side), pressed: pressed, depth: depth))
             .padding(.bottom, depth)
-            .scaleEffect(mashing && !pressed ? 1.06 : 1)
+            .scaleEffect(pulse && !pressed ? 1.06 : 1)
             .opacity(enabled ? 1 : 0.45)
             .animation(.spring(duration: 0.14, bounce: 0.5), value: pressed)
             .contentShape(Circle())
@@ -159,7 +162,10 @@ struct SlamButton: View {
                         pressed = true
                         action()
                     }
-                    .onEnded { _ in pressed = false }
+                    .onEnded { _ in
+                        pressed = false
+                        release()
+                    }
             )
     }
 }

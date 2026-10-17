@@ -36,6 +36,7 @@ struct PuffyText: View {
                 .mask(LinearGradient(stops: [.init(color: .white, location: 0), .init(color: .clear, location: 0.45)],
                                      startPoint: .top, endPoint: .bottom))
         }
+        .multilineTextAlignment(.center)
         .fixedSize()
         .compositingGroup()
         .shadow(color: .black.opacity(0.18), radius: size / 10, y: size / 14)
