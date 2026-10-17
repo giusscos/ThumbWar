@@ -10,12 +10,64 @@ import RealityKit
 import SwiftUI
 import UIKit
 
+/// Where a view looks at the arena from. Also maps screen drags to world
+/// movement so "drag right" always moves the thumb right on that screen.
+struct CameraRig: Equatable {
+    var position: SIMD3<Float>
+    var target: SIMD3<Float>
+    var fov: Float
+    var horizontalFOV = false
+    /// Rolled 180 degrees, for the player sitting across the top of the phone.
+    var flipped = false
+
+    func flipped(_ on: Bool) -> CameraRig {
+        var rig = self
+        rig.flipped = on
+        return rig
+    }
+
+    /// Side-on view used in landscape.
+    static let front = CameraRig(position: [0, 0.36, 0.46], target: [0, 0.095, 0], fov: 34)
+    /// Side-on view framed for a tall screen.
+    static let frontPortrait = CameraRig(position: [0, 0.34, 0.5], target: [0, 0.11, 0], fov: 46, horizontalFOV: true)
+
+    /// Over-the-shoulder view from one player's side of the fists.
+    /// `fov` is horizontal so the thumbs fill the width of any tall screen.
+    static func behind(_ side: Side, fov: Float = 60) -> CameraRig {
+        let s: Float = side == .left ? 1 : -1
+        return CameraRig(position: [-0.19 * s, 0.25, 0.15 * s], target: [0.012 * s, 0.128, 0.004 * s], fov: fov, horizontalFOV: true)
+    }
+
+    /// Screen drag in points (y down) to world XZ meters.
+    func worldDelta(dx: Float, dy: Float, scale: Float) -> SIMD2<Float> {
+        var forward = target - position
+        forward.y = 0
+        forward = normalize(forward)
+        let right = SIMD3<Float>(-forward.z, 0, forward.x)
+        let w = right * dx - forward * dy
+        return SIMD2(w.x, w.z) * scale * (flipped ? -1 : 1)
+    }
+}
+
 @MainActor
 final class ArenaScene {
     let root = Entity()
-    let cameraPosition: SIMD3<Float> = [0, 0.36, 0.46]
+    let rig: CameraRig
+    /// Only one scene per screen advances the simulation; the others just draw it.
+    let drivesSimulation: Bool
+    private var cameraPosition: SIMD3<Float> { rig.position }
     private var thumbs: [ThumbEntity] = []
     private var updateSubscription: EventSubscription?
+
+    init(rig: CameraRig, drivesSimulation: Bool = true) {
+        self.rig = rig
+        self.drivesSimulation = drivesSimulation
+    }
+
+    func stop() {
+        updateSubscription?.cancel()
+        updateSubscription = nil
+    }
 
     func build(in content: RealityViewCameraContent, game: ThumbWarGame) throws {
         root.addChild(makeBackdrop())
@@ -46,15 +98,16 @@ final class ArenaScene {
         root.addChild(rim)
 
         let camera = PerspectiveCamera()
-        camera.camera.fieldOfViewInDegrees = 34
-        camera.look(at: [0, 0.095, 0], from: cameraPosition, relativeTo: nil)
+        camera.camera.fieldOfViewInDegrees = rig.fov
+        camera.camera.fieldOfViewOrientation = rig.horizontalFOV ? .horizontal : .vertical
+        camera.look(at: rig.target, from: rig.position, upVector: rig.flipped ? [0, -1, 0] : [0, 1, 0], relativeTo: nil)
         root.addChild(camera)
 
         content.add(root)
         updateSubscription = content.subscribe(to: SceneEvents.Update.self) { [weak self, weak game] event in
             guard let self, let game else { return }
             let dt = Float(event.deltaTime)
-            game.update(dt: dt)
+            if self.drivesSimulation { game.update(dt: dt) }
             self.sync(game: game, dt: dt)
         }
         sync(game: game, dt: 0)
@@ -76,14 +129,17 @@ final class ArenaScene {
 
     private func mood(for side: Side, in game: ThumbWarGame) -> ThumbEntity.Mood {
         switch game.stage {
-        case .roundOver(let winner), .matchOver(let winner):
+        case .roundOver(let winner):
             return winner == side ? .happy : .worried
+        case .matchOver(let winner):
+            return winner == nil || winner == side ? .happy : .worried
         case .pinned(let pinner):
             return pinner == side ? .happy : .worried
         case .menu, .chant:
             return .happy
         case .fight:
-            return game.thumb(side).phase == .down ? .worried : .fierce
+            let thumb = game.thumb(side)
+            return thumb.phase == .down || thumb.isTired ? .worried : .fierce
         }
     }
 

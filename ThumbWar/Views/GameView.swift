@@ -2,250 +2,173 @@
 //  GameView.swift
 //  ThumbWar
 //
+//  Picks a layout for the screen shape:
+//  - landscape: one side-on view, left/right halves of the screen per player
+//  - portrait vs CPU: over-the-shoulder view, controls along the bottom
+//  - portrait 2 players: split screen, each player gets their own camera and
+//    controls; the top half is flipped for the player across the table
+//
 
 import RealityKit
 import SwiftUI
-import UIKit
 
 struct GameView: View {
     @State private var game = ThumbWarGame()
-    @State private var scene = ArenaScene()
-    @State private var haptics = Haptics()
+    @State private var settings: GameSettings
+    @State private var feedback: GameFeedback
+    @State private var showSettings = false
+    @Environment(\.scenePhase) private var scenePhase
 
-    /// Screen points to world meters for drag input.
-    private let dragScale: Float = 0.0008
+    init() {
+        let settings = GameSettings()
+        _settings = State(initialValue: settings)
+        _feedback = State(initialValue: GameFeedback(settings: settings))
+    }
 
     var body: some View {
-        ZStack {
-            RealityView { content in
-                content.camera = .virtual
-                try? scene.build(in: content, game: game)
-                game.onEvent = { [haptics] in haptics.play($0) }
+        GeometryReader { geo in
+            let portrait = geo.size.height > geo.size.width
+            ZStack {
+                if !portrait {
+                    landscape
+                } else if game.mode == .twoPlayers && game.stage != .menu {
+                    split
+                } else {
+                    portraitSingle
+                }
+
+                if game.stage == .menu {
+                    MenuView(game: game, settings: settings, feedback: feedback, showSettings: $showSettings)
+                }
+                if game.isPaused {
+                    PauseMenu(game: game, settings: settings, feedback: feedback, showSettings: $showSettings)
+                }
+                if showSettings {
+                    SettingsView(settings: settings, feedback: feedback) { showSettings = false }
+                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                }
             }
-            .ignoresSafeArea()
-
-            TouchSurface(
-                sideForLocation: { point, size in
-                    switch game.mode {
-                    case .vsCPU: .left
-                    case .twoPlayers: point.x < size.width / 2 ? .left : .right
-                    }
-                },
-                began: { game.touchBegan($0) },
-                moved: { side, d in
-                    game.touchMoved(side, delta: SIMD2(Float(d.x), Float(d.y)) * dragScale)
-                },
-                ended: { game.touchEnded($0) }
-            )
-            .ignoresSafeArea()
-
-            HUDView(game: game)
+            .animation(.spring(duration: 0.3, bounce: 0.3), value: showSettings)
         }
         .onAppear {
+            game.onEvent = { [feedback, weak game] event in
+                feedback.handle(event, mode: game?.mode ?? .vsCPU)
+            }
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-autostartCPU") { game.start(mode: .vsCPU) }
+            if let forced = UserDefaults.standard.string(forKey: "debugOrientation"),
+               let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: forced == "portrait" ? .portrait : .landscapeRight))
+            }
+            if ProcessInfo.processInfo.arguments.contains("-openSettings") { showSettings = true }
+            if ProcessInfo.processInfo.arguments.contains("-autostartCPU") {
+                game.start(mode: .vsCPU, length: settings.matchLength)
+            } else if ProcessInfo.processInfo.arguments.contains("-autostart2P") {
+                game.start(mode: .twoPlayers, length: settings.matchLength)
+            }
             #endif
+        }
+        .onChange(of: settings.slamControl, initial: true) { game.slamControl = settings.slamControl }
+        .onChange(of: scenePhase) {
+            if scenePhase != .active, game.isPlaying { game.isPaused = true }
         }
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
     }
-}
 
-private struct HUDView: View {
-    let game: ThumbWarGame
+    // MARK: Layouts
 
-    var body: some View {
-        ZStack {
+    private var landscape: some View {
+        let rig = CameraRig.front
+        return ZStack {
+            ArenaView(game: game, rig: rig).id("front")
+                .ignoresSafeArea()
+            touchSurface(rig: rig) { point, size in
+                game.mode == .vsCPU || point.x < size.width / 2 ? .left : .right
+            }
             if game.stage != .menu {
-                VStack {
-                    HStack(alignment: .top) {
-                        ScorePill(side: .left, score: game.scores[0], total: game.roundsToWin,
-                                  label: game.mode == .vsCPU ? "You" : "Blue")
-                        Spacer()
-                        ScorePill(side: .right, score: game.scores[1], total: game.roundsToWin,
-                                  label: game.mode == .vsCPU ? "CPU" : "Red")
-                    }
-                    Spacer()
-                    HStack(alignment: .bottom) {
-                        StaminaBar(value: game.stamina[0], side: .left)
-                        Spacer()
-                        if game.stage == .fight {
-                            Text("Drag to move · Lift to slam")
-                                .font(.system(.footnote, design: .rounded, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.85))
-                                .padding(.horizontal, 12).padding(.vertical, 6)
-                                .background(.black.opacity(0.18), in: Capsule())
-                        }
-                        Spacer()
-                        StaminaBar(value: game.stamina[1], side: .right)
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .allowsHitTesting(false)
+                LandscapeHUD(game: game, settings: settings, feedback: feedback)
             }
-
-            centerBanner
         }
     }
 
-    @ViewBuilder private var centerBanner: some View {
-        switch game.stage {
-        case .menu:
-            MenuView(game: game)
-        case .chant(let beat):
-            BigText(ThumbWarGame.chantWords[beat], color: .white)
-                .id(beat)
-                .transition(.scale(scale: 1.6).combined(with: .opacity))
-                .animation(.spring(duration: 0.3, bounce: 0.5), value: beat)
-                .allowsHitTesting(false)
-        case .pinned(let pinner):
-            VStack(spacing: 8) {
-                BigText("\(min(3, Int(game.pinProgress * 3) + 1))…", color: Color(PuffyMaterials.teamColor(pinner)))
-                Text(game.mode == .vsCPU && pinner == .right ? "Wiggle to escape!" :
-                        "\(pinner.opponent.name), wiggle to escape!")
-                    .font(.system(.headline, design: .rounded, weight: .heavy))
-                    .foregroundStyle(.white)
-                ProgressView(value: min(game.escapeProgress, 1))
-                    .tint(Color(PuffyMaterials.teamColor(pinner.opponent)))
-                    .frame(width: 160)
+    private var portraitSingle: some View {
+        let rig: CameraRig = game.stage == .menu ? .frontPortrait : .behind(.left)
+        return ZStack {
+            ArenaView(game: game, rig: rig).id(game.stage == .menu ? "menu" : "behind")
+                .ignoresSafeArea()
+            touchSurface(rig: rig) { _, _ in .left }
+            if game.stage != .menu {
+                PortraitHUD(game: game, settings: settings, feedback: feedback)
             }
-            .padding(.top, 140)
-            .allowsHitTesting(false)
-        case .roundOver(let winner):
-            BigText(winnerTitle(winner) + " pins it!", color: Color(PuffyMaterials.teamColor(winner)))
-                .allowsHitTesting(false)
-        case .matchOver(let winner):
-            VStack(spacing: 18) {
-                BigText(winnerTitle(winner) + (game.mode == .vsCPU && winner == .left ? " win!" : " wins!"),
-                        color: Color(PuffyMaterials.teamColor(winner)))
-                HStack(spacing: 14) {
-                    PuffyButton(title: "Rematch", color: Color(PuffyMaterials.teamColor(.left))) {
-                        game.start(mode: game.mode)
-                    }
-                    PuffyButton(title: "Menu", color: .orange) { game.backToMenu() }
-                }
-            }
-        case .fight:
-            EmptyView()
         }
     }
 
-    private func winnerTitle(_ side: Side) -> String {
-        guard game.mode == .vsCPU else { return side.name }
-        return side == .left ? "You" : "CPU"
+    private var split: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                half(.right, flipped: true)
+                Rectangle().fill(.white).frame(height: 4)
+                half(.left, flipped: false)
+            }
+            .ignoresSafeArea()
+
+            // Shared clock and pause on the seam between the halves.
+            HStack(spacing: 10) {
+                if let seconds = game.secondsLeft {
+                    TimerPill(seconds: seconds, overtime: game.isOvertime)
+                }
+                if game.isPlaying {
+                    RoundIconButton(systemName: "pause.fill") {
+                        feedback.tap()
+                        game.isPaused = true
+                    }
+                }
+            }
+        }
+    }
+
+    private func half(_ side: Side, flipped: Bool) -> some View {
+        let rig = CameraRig.behind(side, fov: 58).flipped(flipped)
+        return ZStack {
+            ArenaView(game: game, rig: rig, drivesSimulation: side == .left).id("split-\(side)")
+            touchSurface(rig: rig) { _, _ in side }
+            PlayerHalfHUD(game: game, settings: settings, feedback: feedback, viewer: side)
+                .padding(.vertical, 26)
+                .padding(.horizontal, 18)
+                .rotationEffect(.degrees(flipped ? 180 : 0))
+        }
+        .clipped()
+    }
+
+    private func touchSurface(rig: CameraRig, side: @escaping (CGPoint, CGSize) -> Side?) -> some View {
+        TouchSurface(
+            sideForLocation: side,
+            began: { game.touchBegan($0) },
+            moved: { s, d in
+                game.touchMoved(s, delta: rig.worldDelta(dx: Float(d.x), dy: Float(d.y), scale: 0.0008))
+            },
+            ended: { game.touchEnded($0) }
+        )
+        .ignoresSafeArea()
     }
 }
 
-private struct MenuView: View {
+/// One RealityView looking at the arena through a camera rig.
+private struct ArenaView: View {
     let game: ThumbWarGame
+    let rig: CameraRig
+    var drivesSimulation = true
+    @State private var holder = Holder()
+
+    final class Holder { var scene: ArenaScene? }
 
     var body: some View {
-        VStack(spacing: 14) {
-            BigText("THUMB WAR", color: .white)
-            Spacer()
-            HStack(spacing: 14) {
-                PuffyButton(title: "Play vs CPU", color: Color(PuffyMaterials.teamColor(.left))) {
-                    game.start(mode: .vsCPU)
-                }
-                PuffyButton(title: "2 Players", color: Color(PuffyMaterials.teamColor(.right))) {
-                    game.start(mode: .twoPlayers)
-                }
-            }
+        RealityView { content in
+            content.camera = .virtual
+            let scene = ArenaScene(rig: rig, drivesSimulation: drivesSimulation)
+            try? scene.build(in: content, game: game)
+            holder.scene = scene
         }
-        .padding(.vertical, 24)
-    }
-}
-
-private struct BigText: View {
-    let text: String
-    let color: Color
-    init(_ text: String, color: Color) { self.text = text; self.color = color }
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 52, weight: .black, design: .rounded))
-            .foregroundStyle(color)
-            .shadow(color: .black.opacity(0.35), radius: 0, x: 0, y: 4)
-            .shadow(color: .black.opacity(0.2), radius: 10)
-    }
-}
-
-private struct PuffyButton: View {
-    let title: String
-    let color: Color
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(.title3, design: .rounded, weight: .heavy))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 24).padding(.vertical, 14)
-                .background(color.gradient, in: Capsule())
-                .shadow(color: color.opacity(0.5), radius: 0, x: 0, y: 5)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct ScorePill: View {
-    let side: Side
-    let score: Int
-    let total: Int
-    let label: String
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Text(label).font(.system(.headline, design: .rounded, weight: .heavy))
-            HStack(spacing: 4) {
-                ForEach(0..<total, id: \.self) { i in
-                    Circle()
-                        .fill(i < score ? Color.white : Color.white.opacity(0.3))
-                        .frame(width: 11, height: 11)
-                }
-            }
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 14).padding(.vertical, 8)
-        .background(Color(PuffyMaterials.teamColor(side)).gradient, in: Capsule())
-    }
-}
-
-private struct StaminaBar: View {
-    let value: Float
-    let side: Side
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("STAMINA").font(.system(size: 10, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white.opacity(0.85))
-            Capsule()
-                .fill(.black.opacity(0.2))
-                .frame(width: 110, height: 10)
-                .overlay(alignment: .leading) {
-                    Capsule()
-                        .fill(Color(PuffyMaterials.teamColor(side)))
-                        .frame(width: 110 * CGFloat(max(0, value)))
-                }
-        }
-    }
-}
-
-@MainActor
-private final class Haptics {
-    private let light = UIImpactFeedbackGenerator(style: .soft)
-    private let heavy = UIImpactFeedbackGenerator(style: .heavy)
-    private let notify = UINotificationFeedbackGenerator()
-
-    func play(_ event: GameEvent) {
-        switch event {
-        case .chantBeat, .slam: light.impactOccurred(intensity: 0.6)
-        case .miss: light.impactOccurred()
-        case .bump(let speed): heavy.impactOccurred(intensity: CGFloat(min(1, speed)))
-        case .pin: heavy.impactOccurred()
-        case .escape: notify.notificationOccurred(.warning)
-        case .roundWon, .matchWon: notify.notificationOccurred(.success)
-        }
+        .onDisappear { holder.scene?.stop() }
     }
 }

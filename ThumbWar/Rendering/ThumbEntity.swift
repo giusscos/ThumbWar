@@ -23,6 +23,8 @@ final class ThumbEntity: Entity {
     private var pupils: [ModelEntity] = []
     private var brows: [ModelEntity] = []
     private let mouth: ModelEntity
+    private let sweat: ModelEntity
+    private var sweatPhase: Float = 0
     private var blinkTimer: Float = .random(in: 1.5...4)
     private let baseRadius: Float = 0.02
 
@@ -39,6 +41,10 @@ final class ThumbEntity: Entity {
         let black = PuffyMaterials.glossy(UIColor(white: 0.06, alpha: 1), roughness: 0.1)
         let browMat = PuffyMaterials.matte(UIColor(red: 0.35, green: 0.18, blue: 0.1, alpha: 1))
         mouth = ModelEntity(mesh: .generateSphere(radius: 1), materials: [PuffyMaterials.matte(UIColor(red: 0.45, green: 0.12, blue: 0.12, alpha: 1))])
+
+        var drop = PuffyMaterials.glossy(UIColor(red: 0.55, green: 0.85, blue: 1, alpha: 1), roughness: 0.05)
+        drop.blending = .transparent(opacity: 0.85)
+        sweat = ModelEntity(mesh: .generateSphere(radius: 0.0028), materials: [drop])
 
         super.init()
 
@@ -66,6 +72,7 @@ final class ThumbEntity: Entity {
         mouth.position = [0, -0.0062, 0.0004]
         mouth.scale = [0.0035, 0.0016, 0.0012]
         face.addChild(mouth)
+        face.addChild(sweat)
         face.scale = SIMD3(repeating: 1.3)
     }
 
@@ -135,6 +142,14 @@ final class ThumbEntity: Entity {
         case .fierce: [0.0032, 0.0011, 0.0012]
         case .worried: [0.0022, 0.0026, 0.0012]
         case .happy: [0.0042, 0.0024, 0.0012]
+        }
+
+        // A sweat drop slides down the side of a tired thumb.
+        sweat.isEnabled = state.isTired
+        if state.isTired {
+            sweatPhase = (sweatPhase + dt * 0.9).truncatingRemainder(dividingBy: 1)
+            sweat.position = [0.0125, 0.012 - sweatPhase * 0.014, 0.001]
+            sweat.scale = [1, 1.5, 1] * (0.6 + 0.4 * min(1, sweatPhase * 4))
         }
 
         // Blink now and then.
