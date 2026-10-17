@@ -3,9 +3,10 @@
 //  ThumbWar
 //
 //  Dress up each thumb, and the shop: any item can be tried on in the preview;
-//  coin items can be bought right here, premium ones come with purchases.
+//  coin items are bought with coins and premium ones as in-app purchases, right here.
 //
 
+import StoreKit
 import SwiftUI
 
 struct LockerView: View {
@@ -17,6 +18,8 @@ struct LockerView: View {
     @State private var side: Side = .left
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(Career.self) private var career
+    @Environment(Store.self) private var store
+    @Environment(\.purchase) private var purchase
 
     private var landscape: Bool { verticalSizeClass == .compact }
 
@@ -47,6 +50,7 @@ struct LockerView: View {
             .padding(.vertical, 10)
         }
         .onAppear { AccessoryLibrary.shared.loadAll() }
+        .task { await store.loadProducts() }
         .onDisappear { settings.preview = nil }
     }
 
@@ -184,12 +188,7 @@ struct LockerView: View {
                     .buttonStyle(.puffy(short > 0 ? Color(white: 0.7) : .green))
                     .disabled(short > 0)
                 case .premium:
-                    Text("\(item.name) is a premium item · coming soon")
-                        .font(.system(.subheadline, design: .rounded, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14).padding(.vertical, 7)
-                        .background(PuffySurface(shape: Capsule(), color: .pink, depth: 4))
-                        .padding(.bottom, 4)
+                    premiumOffer(item)
                 case .free:
                     EmptyView()
                 }
@@ -197,8 +196,50 @@ struct LockerView: View {
         }
     }
 
+    /// Premium items: the App Store price on a puffy Buy button, plus how the purchase is going.
+    @ViewBuilder private func premiumOffer(_ item: Accessory) -> some View {
+        let status = store.status(of: item)
+        let product = store.products[item.id]
+        Group {
+            switch status {
+            case .pending: Text("Waiting for approval…")
+            case .failed(let message): Text(message)
+            case .idle, .purchasing:
+                Text(product == nil && !store.isLoading ? "Store unavailable · try again later" : "\(item.name) · premium item")
+            }
+        }
+        .font(.system(.subheadline, design: .rounded, weight: .heavy))
+        .foregroundStyle(PuffyPalette.ink)
+        .lineLimit(2)
+        .minimumScaleFactor(0.8)
+        Button {
+            feedback.tap()
+            Task {
+                if await store.purchase(item, using: purchase) { bought(item) }
+            }
+        } label: {
+            // The spinner sits over the hidden label so the button keeps its size.
+            HStack(spacing: 6) {
+                Image(systemName: "star.fill").font(.system(size: 15, weight: .black))
+                Text("Buy")
+                if let product { Text(product.displayPrice) }
+            }
+            .opacity(status == .purchasing ? 0 : 1)
+            .overlay { if status == .purchasing { ProgressView().tint(.white) } }
+            .font(.system(.headline, design: .rounded, weight: .black))
+            .padding(.horizontal, 16).padding(.vertical, 9)
+        }
+        .buttonStyle(.puffy(product == nil || status == .pending ? Color(white: 0.7) : .pink))
+        .disabled(product == nil || status == .purchasing || status == .pending)
+    }
+
     private func buy(_ item: Accessory) {
         guard career.profile.buy(item) else { return }
+        bought(item)
+    }
+
+    /// Equips a newly owned item.
+    private func bought(_ item: Accessory) {
         feedback.play("point")
         settings.loadouts[side.rawValue][item.slot] = item.id
         settings.preview = nil

@@ -8,6 +8,7 @@
 
 /* Begin PBXFileReference section */
 		3BF360683084086100E9B2B9 /* ThumbWar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ThumbWar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3BF3606B3084086100E9B2C0 /* ThumbWar.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThumbWar.storekit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -31,6 +32,7 @@
 			isa = PBXGroup;
 			children = (
 				3BF3606A3084086100E9B2B9 /* ThumbWar */,
+				3BF3606B3084086100E9B2C0 /* ThumbWar.storekit */,
 				3BF360693084086100E9B2B9 /* Products */,
 			);
 			sourceTree = "<group>";

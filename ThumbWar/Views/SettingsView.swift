@@ -12,6 +12,8 @@ struct SettingsView: View {
     let feedback: GameFeedback
     let onDone: () -> Void
 
+    @Environment(Store.self) private var store
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.4)
@@ -102,6 +104,27 @@ struct SettingsView: View {
                                         feedback.tap()
                                     }
                                 }
+                            }
+
+                            section("Purchases", footer: store.restoreMessage
+                                    ?? "Bought premium items on another device, or reinstalled? Get them back here.") {
+                                Button {
+                                    feedback.tap()
+                                    Task { await store.restore() }
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        if store.isRestoring {
+                                            ProgressView().tint(.white)
+                                        } else {
+                                            Image(systemName: "arrow.clockwise")
+                                        }
+                                        Text("Restore Purchases")
+                                    }
+                                    .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                                    .padding(.horizontal, 16).padding(.vertical, 9)
+                                }
+                                .buttonStyle(.puffy(.pink))
+                                .disabled(store.isRestoring)
                             }
                         }
                         .padding(.horizontal, 4)

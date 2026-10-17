@@ -20,13 +20,16 @@ struct GameView: View {
     @State private var showLocker = false
     @State private var showTrophies = false
     @State private var career: Career
+    @State private var store: Store
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let settings = GameSettings()
         _settings = State(initialValue: settings)
         _feedback = State(initialValue: GameFeedback(settings: settings))
-        _career = State(initialValue: Career(profile: Profile(), gameCenter: GameCenter()))
+        let career = Career(profile: Profile(), gameCenter: GameCenter())
+        _career = State(initialValue: career)
+        _store = State(initialValue: Store(profile: career.profile))
     }
 
     var body: some View {
@@ -74,8 +77,14 @@ struct GameView: View {
             .frame(width: geo.size.width, height: geo.size.height)
         }
         .environment(career)
+        .environment(store)
         .onAppear {
             settings.removeUnowned(career.profile.owns)
+            store.onOwnedChange = { [career, settings] in
+                settings.removeUnowned(career.profile.owns)
+                career.checkAchievements()
+            }
+            store.start()
             AccessoryLibrary.shared.load(settings.loadouts.flatMap(\.ids))
             career.connect()
             game.onEvent = { [feedback, career, settings, weak game] event in

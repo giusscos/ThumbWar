@@ -1,0 +1,161 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "7A11E000",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "7A11E001",
+      "localizations" : [
+        {
+          "description" : "A shiny golden crown for royal thumbs.",
+          "displayName" : "Crown",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.giusscos.ThumbWar.item.crown",
+      "referenceName" : "Item : Crown",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "7A11E002",
+      "localizations" : [
+        {
+          "description" : "A magical unicorn horn and ears.",
+          "displayName" : "Unicorn",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.giusscos.ThumbWar.item.unicorn",
+      "referenceName" : "Item : Unicorn",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "7A11E003",
+      "localizations" : [
+        {
+          "description" : "A spinning propeller beanie.",
+          "displayName" : "Propeller",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.giusscos.ThumbWar.item.propeller",
+      "referenceName" : "Item : Propeller",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "7A11E004",
+      "localizations" : [
+        {
+          "description" : "A carved jack-o'-lantern for Halloween.",
+          "displayName" : "Pumpkin",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.giusscos.ThumbWar.item.pumpkin",
+      "referenceName" : "Item : Pumpkin",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "7A11E005",
+      "localizations" : [
+        {
+          "description" : "Bolts, stitches and a flat top. It's alive!",
+          "displayName" : "Monster",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.giusscos.ThumbWar.item.frankenstein",
+      "referenceName" : "Item : Monster",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "7A11E006",
+      "localizations" : [
+        {
+          "description" : "A creepy crawly spider for Halloween.",
+          "displayName" : "Spider",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.giusscos.ThumbWar.item.spider",
+      "referenceName" : "Item : Spider",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_developerTeamID" : "MA7MBQ947C",
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
