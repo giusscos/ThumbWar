@@ -187,3 +187,37 @@ struct PuffyCard<Content: View>: View {
             }
     }
 }
+
+/// Fades a scroll view's content out at its edges instead of cutting it off.
+/// Matching content margins keep the first and last rows clear of the fade at rest.
+struct ScrollEdgeFade: ViewModifier {
+    var axis: Axis = .vertical
+    var length: CGFloat = 20
+
+    func body(content: Content) -> some View {
+        content
+            .contentMargins(axis == .vertical ? .vertical : .horizontal, length, for: .scrollContent)
+            .mask {
+                let fadeIn = Gradient(colors: [.clear, .black])
+                if axis == .vertical {
+                    VStack(spacing: 0) {
+                        LinearGradient(gradient: fadeIn, startPoint: .top, endPoint: .bottom).frame(height: length)
+                        Rectangle()
+                        LinearGradient(gradient: fadeIn, startPoint: .bottom, endPoint: .top).frame(height: length)
+                    }
+                } else {
+                    HStack(spacing: 0) {
+                        LinearGradient(gradient: fadeIn, startPoint: .leading, endPoint: .trailing).frame(width: length)
+                        Rectangle()
+                        LinearGradient(gradient: fadeIn, startPoint: .trailing, endPoint: .leading).frame(width: length)
+                    }
+                }
+            }
+    }
+}
+
+extension View {
+    func scrollEdgeFade(_ axis: Axis = .vertical, length: CGFloat = 20) -> some View {
+        modifier(ScrollEdgeFade(axis: axis, length: length))
+    }
+}

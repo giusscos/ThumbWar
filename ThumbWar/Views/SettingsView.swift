@@ -30,6 +30,7 @@ struct SettingsView: View {
                         options
                         ScrollView { options }
                             .scrollBounceBehavior(.basedOnSize)
+                            .scrollEdgeFade()
                     }
 
                     PuffyButton(title: "Done", color: .green) {

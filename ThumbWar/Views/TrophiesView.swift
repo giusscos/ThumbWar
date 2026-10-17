@@ -31,6 +31,7 @@ struct TrophiesView: View {
                         .padding(4)
                     }
                     .scrollBounceBehavior(.basedOnSize)
+                    .scrollEdgeFade()
                 }
                 .padding(16)
             }
@@ -67,6 +68,7 @@ struct TrophiesView: View {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 8) { boardButtons }
                 ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 8) { boardButtons }.padding(.horizontal, 2) }
+                    .scrollEdgeFade(.horizontal, length: 14)
             }
         } else {
             Label("Sign in to Game Center in the Settings app to see leaderboards.", systemImage: "gamecontroller.fill")

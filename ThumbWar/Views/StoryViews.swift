@@ -43,6 +43,7 @@ struct TourView: View {
                         .padding(4)
                     }
                     .scrollBounceBehavior(.basedOnSize)
+                    .scrollEdgeFade()
                 }
                 .padding(16)
             }

@@ -127,6 +127,7 @@ struct LockerView: View {
             .padding(4)
         }
         .scrollBounceBehavior(.basedOnSize)
+        .scrollEdgeFade()
     }
 
     private struct Section {
