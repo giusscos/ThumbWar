@@ -257,19 +257,19 @@ struct StoryResultView: View {
         VStack(spacing: compact ? 6 : 12) {
             PuffyPop(text: result.won ? "Victory!" : "Defeated!", size: compact ? 54 : 64,
                      color: result.won ? .orange : PuffyPalette.red)
-            Text(result.won ? "You beat \(challenge.rival)!" : "\(challenge.rival) wins this time.")
-                .font(.system(.headline, design: .rounded, weight: .heavy))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14).padding(.vertical, 5)
-                .background(.black.opacity(0.3), in: Capsule())
-            HStack(alignment: .top, spacing: 10) {
-                starColumn(0, "Win", mask: mask)
-                ForEach(Array(challenge.goals.prefix(2).enumerated()), id: \.offset) { k, goal in
-                    starColumn(k + 1, goal.text, mask: mask)
-                }
+            PuffyTag {
+                Text(result.won ? "You beat \(challenge.rival)!" : "\(challenge.rival) wins this time.")
             }
-            .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(.black.opacity(0.3), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            PuffyCard {
+                HStack(alignment: .top, spacing: 10) {
+                    starColumn(0, "Win", mask: mask)
+                    ForEach(Array(challenge.goals.prefix(2).enumerated()), id: \.offset) { k, goal in
+                        starColumn(k + 1, goal.text, mask: mask)
+                    }
+                }
+                .padding(.horizontal, 12).padding(.vertical, compact ? 8 : 12)
+            }
+            .padding(.bottom, 8)
             if result.coins > 0 {
                 HStack(spacing: 6) {
                     PuffyText(text: "+\(result.coins)", size: 30, color: .yellow)
@@ -302,10 +302,7 @@ struct StoryResultView: View {
         let now = result.earned[k]
         let ever = mask & (1 << k) != 0
         return VStack(spacing: 4) {
-            Image(systemName: ever ? "star.fill" : "star")
-                .font(.system(size: 40, weight: .black))
-                .foregroundStyle(ever ? Color.yellow : Color.white.opacity(0.7))
-                .shadow(color: ever ? .orange : .black.opacity(0.3), radius: 0, y: 3)
+            StarIcon(filled: ever, size: 40)
                 .scaleEffect(result.newlyEarned[k] ? 1.15 : 1)
                 .overlay(alignment: .topTrailing) {
                     if result.newlyEarned[k] {
@@ -319,11 +316,11 @@ struct StoryResultView: View {
                 }
             Text(caption)
                 .font(.system(.caption2, design: .rounded, weight: .heavy))
-                .foregroundStyle(.white)
+                .foregroundStyle(PuffyPalette.ink)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .frame(width: 90)
-                .opacity(now || ever ? 1 : 0.75)
+                .opacity(now || ever ? 1 : 0.6)
         }
     }
 }

@@ -9,19 +9,19 @@ revoked purchase takes the item away again.
 ## App Store Connect
 
 Create these in **App Store Connect → your app → Monetization → In-App
-Purchases** (the app record must use the bundle ID `com.giusscos.ThumbWar`).
+Purchases** (the app record must use the bundle ID `com.giusscos.ThumbestWar`).
 All are **Non-Consumable**. The product IDs must match
-`Store.productID(for:)`, which is `com.giusscos.ThumbWar.item.<accessory id>`
+`Store.productID(for:)`, which is `com.giusscos.ThumbestWar.item.<accessory id>`
 with the ids from `ThumbWar/Game/Accessories.swift`.
 
 | Product ID | Reference name | Display name | Price (USD) | Description |
 | --- | --- | --- | --- | --- |
-| `com.giusscos.ThumbWar.item.crown` | Item: Crown | Crown | $1.99 | A shiny golden crown for royal thumbs. |
-| `com.giusscos.ThumbWar.item.unicorn` | Item: Unicorn | Unicorn | $1.99 | A magical unicorn horn and ears. |
-| `com.giusscos.ThumbWar.item.propeller` | Item: Propeller | Propeller | $0.99 | A spinning propeller beanie. |
-| `com.giusscos.ThumbWar.item.pumpkin` | Item: Pumpkin | Pumpkin | $0.99 | A carved jack-o'-lantern for Halloween. |
-| `com.giusscos.ThumbWar.item.frankenstein` | Item: Monster | Monster | $1.99 | Bolts, stitches and a flat top. It's alive! |
-| `com.giusscos.ThumbWar.item.spider` | Item: Spider | Spider | $0.99 | A creepy crawly spider for Halloween. |
+| `com.giusscos.ThumbestWar.item.crown` | Item: Crown | Crown | $1.99 | A shiny golden crown for royal thumbs. |
+| `com.giusscos.ThumbestWar.item.unicorn` | Item: Unicorn | Unicorn | $1.99 | A magical unicorn horn and ears. |
+| `com.giusscos.ThumbestWar.item.propeller` | Item: Propeller | Propeller | $0.99 | A spinning propeller beanie. |
+| `com.giusscos.ThumbestWar.item.pumpkin` | Item: Pumpkin | Pumpkin | $0.99 | A carved jack-o'-lantern for Halloween. |
+| `com.giusscos.ThumbestWar.item.frankenstein` | Item: Monster | Monster | $1.99 | Bolts, stitches and a flat top. It's alive! |
+| `com.giusscos.ThumbestWar.item.spider` | Item: Spider | Spider | $0.99 | A creepy crawly spider for Halloween. |
 
 For each one you also need:
 
@@ -39,7 +39,7 @@ attach them in the version's **In-App Purchases and Subscriptions** section.
 ## Adding new premium items
 
 1. Add the accessory to `Accessory.all` with `unlock: .premium`.
-2. Create a non-consumable with ID `com.giusscos.ThumbWar.item.<id>` in App Store
+2. Create a non-consumable with ID `com.giusscos.ThumbestWar.item.<id>` in App Store
    Connect, and add the same product to `ThumbWar.storekit`.
 
 Nothing else in the code needs to change.

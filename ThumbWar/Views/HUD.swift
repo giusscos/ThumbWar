@@ -128,13 +128,14 @@ struct PlayerHalfHUD: View {
                 Spacer()
                 HStack(alignment: .bottom) {
                     // Scores live down by the player, keeping the seam free for the clock.
-                    VStack(alignment: .leading, spacing: 10) {
+                    // Stamina sits above them, clear of the screen edge and the Dynamic Island.
+                    VStack(alignment: .leading, spacing: 8) {
+                        StaminaBar(value: game.stamina[viewer.rawValue], side: .left, tint: viewer)
                         HStack(spacing: 8) {
                             ScorePill(side: viewer, score: game.scores[viewer.rawValue], label: game.label(viewer, viewer: viewer))
                             ScorePill(side: viewer.opponent, score: game.scores[viewer.opponent.rawValue],
                                       label: game.label(viewer.opponent, viewer: viewer))
                         }
-                        StaminaBar(value: game.stamina[viewer.rawValue], side: .left, tint: viewer)
                     }
                     Spacer()
                     if settings.slamControl == .button && game.isPlaying {
@@ -211,11 +212,7 @@ struct StageBanner: View {
         return VStack(spacing: 6) {
             PuffyPop(text: "\(count)", size: 72 * scale, color: PuffyPalette.team(pinner))
                 .id(count)
-            Text(line)
-                .font(.system(compact ? .subheadline : .headline, design: .rounded, weight: .heavy))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12).padding(.vertical, 5)
-                .background(.black.opacity(0.25), in: Capsule())
+            PuffyTag(compact: compact) { Text(line) }
             TugBar(progress: game.escapeProgress, escaper: pinned)
                 .frame(width: 200)
         }
@@ -270,8 +267,12 @@ struct MenuView: View {
             VStack(spacing: 14) {
                 ViewThatFits(in: .horizontal) {
                     // Landscape shares the top row with the corner buttons, so it's a bit smaller.
-                    PuffyText(text: "THUMB WAR", size: verticalSizeClass == .compact ? 50 : 60, color: .orange)
-                    PuffyText(text: "THUMB WAR", size: 44, color: .orange)
+                    PuffyText(text: "THUMBEST WAR", size: verticalSizeClass == .compact ? 50 : 60, color: .orange)
+                    PuffyText(text: "THUMBEST WAR", size: 44, color: .orange)
+                    VStack(spacing: 0) {
+                        PuffyText(text: "THUMBEST", size: 44, color: .orange)
+                        PuffyText(text: "WAR", size: 44, color: .orange)
+                    }
                 }
                 // Clear of the corner buttons in portrait; landscape keeps it off the thumbs.
                 .padding(.top, verticalSizeClass == .compact ? 8 : 96)
@@ -320,18 +321,23 @@ struct MenuView: View {
             career.showTour = true
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "map.fill")
-                Text("Thumb Tour")
+                Group {
+                    Image(systemName: "map.fill")
+                    Text("Thumb Tour")
+                }
+                .shadow(color: .black.opacity(0.18), radius: 0, y: 1.5)
                 HStack(spacing: 3) {
                     StarIcon(filled: true, size: 14)
                     Text("\(career.profile.totalStars)")
+                        .monospacedDigit()
+                        .foregroundStyle(PuffyPalette.ink)
                 }
                 .font(.system(.subheadline, design: .rounded, weight: .black))
                 .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(.white.opacity(0.25), in: Capsule())
+                .background(PuffySurface(shape: Capsule(), color: .white, depth: 3))
+                .padding(.bottom, 3)
             }
             .font(.system(.title3, design: .rounded, weight: .heavy))
-            .shadow(color: .black.opacity(0.18), radius: 0, y: 1.5)
             .padding(.horizontal, 22)
             .padding(.vertical, 13)
         }
@@ -366,18 +372,26 @@ struct PauseMenu: View {
             VStack(spacing: 16) {
                 PuffyText(text: "Paused", size: 56, color: .orange)
                 if let challenge = career.activeChallenge {
-                    // Remind the player what the stars are for.
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("vs \(challenge.rival)")
-                            .font(.system(.headline, design: .rounded, weight: .black))
-                        ForEach(["Win the match"] + challenge.goals.prefix(2).map(\.text), id: \.self) { goal in
-                            Label(goal, systemImage: "star.fill")
-                                .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                    // Remind the player what the stars are for; stars already earned show filled.
+                    let mask = career.profile.starMask(challenge)
+                    let goals = ["Win the match"] + challenge.goals.prefix(2).map(\.text)
+                    PuffyCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("vs \(challenge.rival)".uppercased())
+                                .font(.system(.footnote, design: .rounded, weight: .black))
+                                .foregroundStyle(PuffyPalette.ink.opacity(0.7))
+                            ForEach(Array(goals.enumerated()), id: \.offset) { k, goal in
+                                HStack(spacing: 8) {
+                                    StarIcon(filled: mask & (1 << k) != 0, size: 18)
+                                    Text(goal)
+                                        .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                                        .foregroundStyle(PuffyPalette.ink)
+                                }
+                            }
                         }
+                        .padding(.horizontal, 18).padding(.vertical, 14)
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16).padding(.vertical, 10)
-                    .background(.black.opacity(0.3), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .frame(maxWidth: 360)
                 }
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) { buttons }
@@ -436,12 +450,22 @@ struct HintPill: View {
 
     var body: some View {
         if game.stage == .fight {
-            Text(settings.slamControl == .lift ? "Drag to move · Lift to slam" : "Drag · Tap SLAM · Hold to hook")
-                .font(.system(.footnote, design: .rounded, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.9))
-                .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(.black.opacity(0.18), in: Capsule())
-                .allowsHitTesting(false)
+            PuffyTag(compact: true) {
+                Label(settings.slamControl == .lift ? "Drag to move · Lift to slam" : "Drag · Tap SLAM · Hold to hook",
+                      systemImage: "hand.draw.fill")
+                    .labelStyle(HintLabelStyle())
+            }
+            .allowsHitTesting(false)
+        }
+    }
+}
+
+/// Icon tinted orange, text in ink, kept tight.
+private struct HintLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 6) {
+            configuration.icon.foregroundStyle(.orange)
+            configuration.title
         }
     }
 }
@@ -500,52 +524,89 @@ struct TugBar: View {
     let escaper: Side
 
     var body: some View {
+        let depth: CGFloat = 4
         Capsule()
-            .fill(PuffyPalette.team(escaper.opponent))
-            .frame(height: 18)
+            .fill(gloss(PuffyPalette.team(escaper.opponent)))
             .overlay(alignment: .leading) {
                 GeometryReader { geo in
                     Capsule()
-                        .fill(PuffyPalette.team(escaper))
+                        .fill(gloss(PuffyPalette.team(escaper)))
                         .frame(width: geo.size.width * CGFloat(min(1, max(0, progress))))
                         .animation(.spring(duration: 0.15), value: progress)
                 }
             }
-            .overlay { Rectangle().fill(.white).frame(width: 3, height: 26) }
-            .overlay(Capsule().stroke(.white, lineWidth: 3))
+            .clipShape(Capsule())
+            .overlay { Capsule().fill(.white).frame(width: 4, height: 14) }
+            .overlay(Capsule().strokeBorder(.white, lineWidth: 3))
+            .frame(height: 20)
+            .background(Capsule().fill(PuffyPalette.ink.opacity(0.45)).offset(y: depth))
+            .padding(.bottom, depth)
+    }
+
+    private func gloss(_ color: Color) -> LinearGradient {
+        LinearGradient(colors: [color.mix(with: .white, by: 0.3), color], startPoint: .top, endPoint: .bottom)
     }
 }
 
+/// A white puffy pill: bolt, label and bar, readable over any part of the arena.
 struct StaminaBar: View {
     let value: Float
-    /// Which edge the bar grows from.
+    /// Which edge the bar grows from; the bolt sits on that side too.
     let side: Side
     /// Bar color; defaults to `side`.
     var tint: Side?
 
+    private let barWidth: CGFloat = 96
+
     var body: some View {
         let tired = value < Stamina.tired
         let leading = side == .left
-        VStack(alignment: leading ? .leading : .trailing, spacing: 4) {
-            Text(tired ? "TIRED!" : "STAMINA")
-                .font(.system(size: 10, weight: .heavy, design: .rounded))
-                .foregroundStyle(tired ? Color.red : .white.opacity(0.9))
-            Capsule()
-                .fill(.black.opacity(0.2))
-                .frame(width: 120, height: 12)
-                .overlay(alignment: leading ? .leading : .trailing) {
-                    Capsule()
-                        .fill(tired ? Color.red : PuffyPalette.team(tint ?? side))
-                        .frame(width: 120 * CGFloat(max(0, value)))
-                }
-                .overlay(alignment: leading ? .leading : .trailing) {
-                    // Tick showing what one slam costs.
-                    Rectangle().fill(.white.opacity(0.7))
-                        .frame(width: 2, height: 12)
-                        .offset(x: (leading ? 1 : -1) * 120 * CGFloat(Stamina.slamCost))
-                }
-                .overlay(Capsule().stroke(.white.opacity(0.8), lineWidth: 2))
+        let color = PuffyPalette.team(tint ?? side)
+        HStack(spacing: 7) {
+            if leading { bolt(tired: tired) }
+            VStack(alignment: leading ? .leading : .trailing, spacing: 3) {
+                Text(tired ? "TIRED!" : "STAMINA")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(tired ? PuffyPalette.red : PuffyPalette.ink.opacity(0.8))
+                bar(color: color, tired: tired, leading: leading)
+            }
+            if !leading { bolt(tired: tired) }
         }
+        .padding(.leading, leading ? 8 : 14).padding(.trailing, leading ? 14 : 8)
+        .padding(.vertical, 6)
+        .background(PuffySurface(shape: Capsule(), color: .white, depth: 4))
+        .padding(.bottom, 4)
+        .scaleEffect(tired ? 1.06 : 1)
+        .animation(.spring(duration: 0.3, bounce: 0.6), value: tired)
         .allowsHitTesting(false)
+    }
+
+    private func bolt(tired: Bool) -> some View {
+        Image(systemName: tired ? "bolt.slash.fill" : "bolt.fill")
+            .font(.system(size: 18, weight: .black))
+            .foregroundStyle(tired ? PuffyPalette.red : .yellow)
+            .shadow(color: tired ? PuffyPalette.red.mix(with: .black, by: 0.3) : .orange, radius: 0, y: 1.5)
+            .frame(width: 22)
+    }
+
+    private func bar(color: Color, tired: Bool, leading: Bool) -> some View {
+        let fill = tired ? PuffyPalette.red : color
+        return Capsule()
+            .fill(PuffyPalette.ink.opacity(0.15))
+            .frame(width: barWidth, height: 12)
+            .overlay(alignment: leading ? .leading : .trailing) {
+                Capsule()
+                    .fill(LinearGradient(colors: [fill.mix(with: .white, by: 0.3), fill],
+                                         startPoint: .top, endPoint: .bottom))
+                    .frame(width: barWidth * CGFloat(min(1, max(0, value))))
+                    .animation(.spring(duration: 0.2), value: value)
+            }
+            .overlay(alignment: leading ? .leading : .trailing) {
+                // Tick showing what one slam costs.
+                Capsule().fill(PuffyPalette.ink.opacity(0.35))
+                    .frame(width: 2, height: 8)
+                    .offset(x: (leading ? 1 : -1) * barWidth * CGFloat(Stamina.slamCost))
+            }
+            .clipShape(Capsule())
     }
 }

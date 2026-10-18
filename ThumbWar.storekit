@@ -23,7 +23,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.giusscos.ThumbWar.item.crown",
+      "productID" : "com.giusscos.ThumbestWar.item.crown",
       "referenceName" : "Item : Crown",
       "type" : "NonConsumable"
     },
@@ -38,7 +38,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.giusscos.ThumbWar.item.unicorn",
+      "productID" : "com.giusscos.ThumbestWar.item.unicorn",
       "referenceName" : "Item : Unicorn",
       "type" : "NonConsumable"
     },
@@ -53,7 +53,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.giusscos.ThumbWar.item.propeller",
+      "productID" : "com.giusscos.ThumbestWar.item.propeller",
       "referenceName" : "Item : Propeller",
       "type" : "NonConsumable"
     },
@@ -68,7 +68,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.giusscos.ThumbWar.item.pumpkin",
+      "productID" : "com.giusscos.ThumbestWar.item.pumpkin",
       "referenceName" : "Item : Pumpkin",
       "type" : "NonConsumable"
     },
@@ -83,7 +83,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.giusscos.ThumbWar.item.frankenstein",
+      "productID" : "com.giusscos.ThumbestWar.item.frankenstein",
       "referenceName" : "Item : Monster",
       "type" : "NonConsumable"
     },
@@ -98,7 +98,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.giusscos.ThumbWar.item.spider",
+      "productID" : "com.giusscos.ThumbestWar.item.spider",
       "referenceName" : "Item : Spider",
       "type" : "NonConsumable"
     }

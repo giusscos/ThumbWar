@@ -170,6 +170,22 @@ struct SlamButton: View {
     }
 }
 
+/// A small white puffy capsule for hints and info lines floating over the arena.
+struct PuffyTag<Content: View>: View {
+    var compact = false
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .font(.system(compact ? .footnote : .subheadline, design: .rounded, weight: .heavy))
+            .foregroundStyle(PuffyPalette.ink)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, compact ? 12 : 14).padding(.vertical, compact ? 5 : 7)
+            .background(PuffySurface(shape: Capsule(), color: .white, depth: 4))
+            .padding(.bottom, 4)
+    }
+}
+
 /// Cream card with a thick white rim and a darker base, like a toy panel.
 struct PuffyCard<Content: View>: View {
     @ViewBuilder let content: Content

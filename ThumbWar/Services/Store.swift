@@ -40,7 +40,7 @@ final class Store {
         self.profile = profile
     }
 
-    static func productID(for item: Accessory) -> String { "com.giusscos.ThumbWar.item.\(item.id)" }
+    static func productID(for item: Accessory) -> String { "com.giusscos.ThumbestWar.item.\(item.id)" }
 
     private static func item(forProductID id: String) -> Accessory? {
         Accessory.all.first { $0.unlock == .premium && productID(for: $0) == id }

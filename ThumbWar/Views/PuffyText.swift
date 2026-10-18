@@ -76,7 +76,7 @@ struct PuffyPop: View {
 
 #Preview {
     VStack(spacing: 30) {
-        PuffyText(text: "THUMB WAR!", size: 80, color: .orange)
+        PuffyText(text: "THUMBEST WAR!", size: 80, color: .orange)
         PuffyText(text: "1", size: 120, color: .blue)
     }
     .padding()

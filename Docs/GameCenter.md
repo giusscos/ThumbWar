@@ -3,7 +3,7 @@
 The game keeps its own progress (coins, stars, achievements) on the device and
 mirrors it to Game Center when the player is signed in. For the Game Center side
 to work, create these in **App Store Connect → your app → Services → Game Center**
-(the app record must use the bundle ID `com.giusscos.ThumbWar`).
+(the app record must use the bundle ID `com.giusscos.ThumbestWar`).
 
 The IDs below must match `ThumbWar/Game/Achievements.swift` exactly.
 
