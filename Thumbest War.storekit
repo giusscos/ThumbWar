@@ -1,0 +1,138 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "8992CFFE",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "6824208317",
+      "localizations" : [
+        {
+          "description" : "A shiny golden crown for royal thumbs.",
+          "displayName" : "Crown",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.giusscos.ThumbestWar.item.crown",
+      "referenceName" : "Item: Crown",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "6824208551",
+      "localizations" : [
+        {
+          "description" : "Bolts, stitches and a flat top. It's alive!",
+          "displayName" : "Monster",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.giusscos.ThumbestWar.item.frankenstein",
+      "referenceName" : "Item: Monster",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "6824208322",
+      "localizations" : [
+        {
+          "description" : "A spinning propeller beanie.",
+          "displayName" : "Propeller",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.giusscos.ThumbestWar.item.propeller",
+      "referenceName" : "Item: Propeller",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "6824208408",
+      "localizations" : [
+        {
+          "description" : "A carved jack-o'-lantern for Halloween.",
+          "displayName" : "Pumpkin",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.giusscos.ThumbestWar.item.pumpkin",
+      "referenceName" : "Item: Pumpkin",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "6824208394",
+      "localizations" : [
+        {
+          "description" : "A creepy crawly spider for Halloween.",
+          "displayName" : "Spider",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.giusscos.ThumbestWar.item.spider",
+      "referenceName" : "Item: Spider",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "6824208318",
+      "localizations" : [
+        {
+          "description" : "A magical unicorn horn and ears.",
+          "displayName" : "Unicorn",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.giusscos.ThumbestWar.item.unicorn",
+      "referenceName" : "Item: Unicorn",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6824170928",
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_developerTeamID" : "MA7MBQ947C",
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 814022652.80962706,
+    "_locale" : "en_US",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionBundleGroups" : [
+
+  ],
+  "subscriptionGroups" : [
+
+  ],
+  "subscriptionSuiteGroups" : [
+
+  ],
+  "version" : {
+    "major" : 6,
+    "minor" : 3
+  }
+}

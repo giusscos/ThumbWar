@@ -51,7 +51,7 @@
          </BuildableReference>
       </BuildableProductRunnable>
       <StoreKitConfigurationFileReference
-         identifier = "../../ThumbWar.storekit">
+         identifier = "../../Thumbest War.storekit">
       </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction

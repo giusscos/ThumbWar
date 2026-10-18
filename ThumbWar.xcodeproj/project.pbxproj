@@ -6,14 +6,32 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		3B3C764B3084FFF900849615 /* Thumbest War.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 3B3C764A3084FFF900849615 /* Thumbest War.storekit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		3B3C764A3084FFF900849615 /* Thumbest War.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Thumbest War.storekit"; sourceTree = "<group>"; };
 		3BF360683084086100E9B2B9 /* ThumbWar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ThumbWar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3BF3606B3084086100E9B2C0 /* ThumbWar.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThumbWar.storekit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		3B3C764D3085094A00849615 /* Exceptions for "ThumbWar" folder in "ThumbWar" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 3BF360673084086100E9B2B9 /* ThumbWar */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		3BF3606A3084086100E9B2B9 /* ThumbWar */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3B3C764D3085094A00849615 /* Exceptions for "ThumbWar" folder in "ThumbWar" target */,
+			);
 			path = ThumbWar;
 			sourceTree = "<group>";
 		};
@@ -33,6 +51,7 @@
 			children = (
 				3BF3606A3084086100E9B2B9 /* ThumbWar */,
 				3BF3606B3084086100E9B2C0 /* ThumbWar.storekit */,
+				3B3C764A3084FFF900849615 /* Thumbest War.storekit */,
 				3BF360693084086100E9B2B9 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -104,6 +123,7 @@
 		3BF360663084086100E9B2B9 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				3B3C764B3084FFF900849615 /* Thumbest War.storekit in Resources */,
 			);
 		};
 /* End PBXResourcesBuildPhase section */
@@ -250,7 +270,9 @@
 				DEVELOPMENT_TEAM = MA7MBQ947C;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ThumbWar/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ThumbestWar;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.arcade-games";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -285,7 +307,9 @@
 				DEVELOPMENT_TEAM = MA7MBQ947C;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ThumbWar/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ThumbestWar;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.arcade-games";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
