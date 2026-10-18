@@ -4,7 +4,7 @@ Draft for App Store Connect (English, U.S.). Character limits in brackets.
 
 ## Name [30]
 
-ThumbestWar
+Thumbest War
 
 ## Subtitle [30]
 
@@ -18,7 +18,7 @@ One, two, three, four, I declare a THUMB WAR! Wrestle the CPU, a friend on the s
 
 One, two, three, four, I declare a THUMB WAR!
 
-ThumbestWar turns the classic playground battle into a squishy, puffy 3D showdown. Drag to move, slam to pin, and hold your rival down for a 3-count to win the round.
+Thumbest War turns the classic playground battle into a squishy, puffy 3D showdown. Drag to move, slam to pin, and hold your rival down for a 3-count to win the round.
 
 PIN, WIGGLE, WIN
 • Slam down on your rival and hold them for 1, 2, 3!

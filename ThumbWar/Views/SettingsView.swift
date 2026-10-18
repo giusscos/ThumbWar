@@ -128,7 +128,7 @@ struct SettingsView: View {
                                 .disabled(store.isRestoring)
                             }
 
-                            section("About", footer: "ThumbestWar collects no data. No accounts, no ads, no tracking.") {
+                            section("About", footer: "Thumbest War collects no data. No accounts, no ads, no tracking.") {
                                 HStack(spacing: 10) {
                                     linkChip("Privacy Policy", systemImage: "hand.raised.fill",
                                              url: "https://giusscos.com/work/thumbestwar/privacy/")
