@@ -127,9 +127,33 @@ struct SettingsView: View {
                                 .buttonStyle(.puffy(.pink))
                                 .disabled(store.isRestoring)
                             }
+
+                            section("About", footer: "ThumbestWar collects no data. No accounts, no ads, no tracking.") {
+                                HStack(spacing: 10) {
+                                    linkChip("Privacy Policy", systemImage: "hand.raised.fill",
+                                             url: "https://giusscos.com/work/thumbestwar/privacy/")
+                                    linkChip("Support", systemImage: "questionmark.bubble.fill",
+                                             url: "https://giusscos.com/work/thumbestwar/support/")
+                                }
+                            }
                         }
                         .padding(.horizontal, 4)
                         .padding(.bottom, 4)
+    }
+
+    /// Opens a page on giusscos.com in the browser.
+    private func linkChip(_ title: String, systemImage: String, url: String) -> some View {
+        Link(destination: URL(string: url)!) {
+            Label(title, systemImage: systemImage)
+                .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.puffy(.white, text: PuffyPalette.ink))
+        .simultaneousGesture(TapGesture().onEnded { feedback.tap() })
     }
 
     private func section(_ title: String, footer: String?, @ViewBuilder content: () -> some View) -> some View {
