@@ -39,7 +39,7 @@ struct GameView: View {
                 if !portrait {
                     landscape
                 } else if game.mode == .twoPlayers && game.stage != .menu {
-                    split
+                    split(insets: geo.safeAreaInsets)
                 } else {
                     portraitSingle
                 }
@@ -73,6 +73,20 @@ struct GameView: View {
             .animation(.spring(duration: 0.3, bounce: 0.3), value: showTrophies)
             .animation(.spring(duration: 0.3, bounce: 0.3), value: career.showTour)
             .overlay { ToastStack(toasts: career.toasts) }
+            #if DEBUG
+            .overlay {
+                if ProcessInfo.processInfo.arguments.contains("-iconShot") {
+                    // Icon render: a square of the arena pinned to the top, nothing else.
+                    ZStack(alignment: .top) {
+                        Color.black.ignoresSafeArea()
+                        ArenaView(game: game, settings: settings, rig: .icon, drivesSimulation: false)
+                            .frame(width: geo.size.width, height: geo.size.width)
+                    }
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .ignoresSafeArea()
+                }
+            }
+            #endif
             // A fixed frame: an oversized banner can never widen the layout and shift the camera.
             .frame(width: geo.size.width, height: geo.size.height)
         }
@@ -150,12 +164,15 @@ struct GameView: View {
         }
     }
 
-    private var split: some View {
+    private func split(insets: EdgeInsets) -> some View {
         ZStack {
             VStack(spacing: 0) {
-                half(.right, flipped: true)
+                // Each HUD sits by its player's screen edge: the top one by the front camera.
+                // A punch-hole camera (iPhone Duo's outer display) isn't in the safe area,
+                // so the top HUD always keeps at least 64pt clear of the edge.
+                half(.right, flipped: true, edgeInset: max(insets.top, 64))
                 Rectangle().fill(.white).frame(height: 4)
-                half(.left, flipped: false)
+                half(.left, flipped: false, edgeInset: insets.bottom)
             }
             .ignoresSafeArea()
 
@@ -174,13 +191,15 @@ struct GameView: View {
         }
     }
 
-    private func half(_ side: Side, flipped: Bool) -> some View {
+    /// `edgeInset` is the safe area at this half's outer screen edge, where its HUD sits.
+    private func half(_ side: Side, flipped: Bool, edgeInset: CGFloat) -> some View {
         let rig = CameraRig.behind(side, fov: 58).flipped(flipped)
         return ZStack {
             ArenaView(game: game, settings: settings, rig: rig, drivesSimulation: side == .left).id("split-\(side)")
             touchSurface(rig: rig) { _, _ in side }
             PlayerHalfHUD(game: game, settings: settings, feedback: feedback, viewer: side)
-                .padding(.vertical, 26)
+                .padding(.top, 26)
+                .padding(.bottom, max(26, edgeInset + 8))
                 .padding(.horizontal, 18)
                 .rotationEffect(.degrees(flipped ? 180 : 0))
         }

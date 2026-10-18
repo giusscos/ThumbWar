@@ -44,6 +44,17 @@ struct CameraRig: Equatable {
         return CameraRig(position: [x * 0.7, 0.215, 0.2], target: [x, 0.158, 0], fov: 34)
     }
 
+    #if DEBUG
+    /// Square close-up of both thumbs for rendering the app icon (`-iconShot`).
+    /// `-iconCam "px,py,pz,tx,ty,tz,fov"` overrides it while framing.
+    static var icon: CameraRig {
+        let v = (UserDefaults.standard.string(forKey: "iconCam") ?? "")
+            .split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
+        guard v.count == 7 else { return CameraRig(position: [0, 0.2, 0.2], target: [0, 0.14, 0], fov: 32) }
+        return CameraRig(position: [v[0], v[1], v[2]], target: [v[3], v[4], v[5]], fov: v[6])
+    }
+    #endif
+
     /// Screen drag in points (y down) to world XZ meters.
     func worldDelta(dx: Float, dy: Float, scale: Float) -> SIMD2<Float> {
         var forward = target - position
@@ -123,7 +134,11 @@ final class ArenaScene {
 
     private func sync(game: ThumbWarGame, dt: Float) {
         // Dress the thumbs once the models are loaded, and whenever the loadout changes.
-        if let settings {
+        var dress = settings != nil
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-iconShot") { dress = false }
+        #endif
+        if dress, let settings {
             for side in Side.allCases {
                 let want = settings.effectiveLoadout(side)
                 guard thumbs[side.rawValue].wearing != want else { continue }
@@ -148,6 +163,9 @@ final class ArenaScene {
     }
 
     private func mood(for side: Side, in game: ThumbWarGame) -> ThumbEntity.Mood {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-iconShot"), game.stage == .menu { return .fierce }
+        #endif
         switch game.stage {
         case .roundOver(let winner):
             return winner == side ? .happy : .worried

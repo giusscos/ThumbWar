@@ -1,0 +1,82 @@
+{
+  "fill": {
+    "automatic-gradient": "extended-srgb:0.18824,0.41176,0.82353,1.00000"
+  },
+  "groups": [
+    {
+      "name": "Thumbs",
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "thumbs.png",
+          "name": "thumbs"
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "name": "Background",
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "background.png",
+          "name": "background"
+        }
+      ],
+      "opacity-specializations": [
+        {
+          "appearance": "dark",
+          "value": 0
+        }
+      ],
+      "shadow": {
+        "kind": "none",
+        "opacity": 0.5
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "name": "Background dark",
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "background-dark.png",
+          "name": "background-dark"
+        }
+      ],
+      "opacity-specializations": [
+        {
+          "value": 0
+        },
+        {
+          "appearance": "dark",
+          "value": 1
+        }
+      ],
+      "shadow": {
+        "kind": "none",
+        "opacity": 0.5
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}
