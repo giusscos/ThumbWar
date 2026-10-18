@@ -19,16 +19,17 @@ All: **Classic**, score format **Integer**, sort **High to Low**, keep the **bes
 
 ## Achievements
 
-Game Center allows 1000 points in total; the points below add up to exactly 1000
-and follow the in-game coin rewards. Each achievement also needs a 512×512 or
-1024×1024 image.
+Game Center allows 1000 points in total and at most 100 per achievement; the
+points below add up to 965 and follow the in-game coin rewards. Each achievement
+has a 512×512 badge image (drawn in the game's puffy style when they were created
+in App Store Connect).
 
 | Achievement ID | Title | Description | Points | Coins in game |
 | --- | --- | --- | --- | --- |
 | `thumbwar.achievement.first_win` | First Pin-Down | Beat the CPU once | 10 | 25 |
 | `thumbwar.achievement.pins_25` | Pin Pal | Score 25 pins against the CPU | 20 | 50 |
 | `thumbwar.achievement.pins_100` | Pin Pro | Score 100 pins against the CPU | 65 | 150 |
-| `thumbwar.achievement.pins_300` | Pin Legend | Score 300 pins against the CPU | 115 | 300 |
+| `thumbwar.achievement.pins_300` | Pin Legend | Score 300 pins against the CPU | 100 | 300 |
 | `thumbwar.achievement.jump_1` | Leap of Thumb | Pin with a jumping slam | 20 | 50 |
 | `thumbwar.achievement.jump_20` | Frequent Flyer | Score 20 jumping pins | 65 | 150 |
 | `thumbwar.achievement.escape_10` | Slippery Thumb | Escape 10 pins | 45 | 100 |
@@ -43,7 +44,7 @@ and follow the in-game coin rewards. Each achievement also needs a 512×512 or
 | `thumbwar.achievement.tour_5` | Backyard Champ | Beat Sheriff Sam | 45 | 100 |
 | `thumbwar.achievement.tour_10` | City Slicker | Beat Merlin Thumb | 65 | 150 |
 | `thumbwar.achievement.tour_15` | Captain of the Seas | Beat Unicorn Uma | 85 | 200 |
-| `thumbwar.achievement.tour_20` | Thumb Royalty | Beat King Thumbert | 120 | 300 |
+| `thumbwar.achievement.tour_20` | Thumb Royalty | Beat King Thumbert | 100 | 300 |
 | `thumbwar.achievement.stars_60` | Superstar | Earn all 60 Thumb Tour stars | 30 | 100 |
 
 ## Coin economy
