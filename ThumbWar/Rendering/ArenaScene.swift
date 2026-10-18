@@ -76,6 +76,7 @@ final class ArenaScene {
     private var thumbs: [ThumbEntity] = []
     private var settings: GameSettings?
     private var updateSubscription: EventSubscription?
+    private var frame = 0
 
     init(rig: CameraRig, drivesSimulation: Bool = true) {
         self.rig = rig
@@ -128,8 +129,32 @@ final class ArenaScene {
             let dt = Float(event.deltaTime)
             if self.drivesSimulation { game.update(dt: dt) }
             self.sync(game: game, dt: dt)
+            if self.frame % 60 == 0 { Self.presentWithoutTransaction() }
+            self.frame += 1
         }
         sync(game: game, dt: 0)
+    }
+
+    /// RealityKit turns on `presentsWithTransaction` for a RealityView that doesn't
+    /// fill the window (the Locker preview, the icon shot, a split-screen half).
+    /// With a second RealityView on screen that deadlocks: all views share one
+    /// render thread, the main thread waits on it to commit a frame, and it waits
+    /// for a drawable this layer only gives back once the main thread commits its
+    /// transaction. `nextDrawable` times out after a second, so every view drops to
+    /// about 1 fps for as long as it lasts, and the frames drawn in between lose
+    /// the LowLevelMesh thumbs (just the face, hat and a flat headband show).
+    /// Presenting straight away avoids it. Rechecked about once a second so
+    /// views that appear later are covered too.
+    private static func presentWithoutTransaction() {
+        func visit(_ layer: CALayer) {
+            if let metal = layer as? CAMetalLayer, metal.presentsWithTransaction {
+                metal.presentsWithTransaction = false
+            }
+            layer.sublayers?.forEach(visit)
+        }
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+            scene.windows.forEach { visit($0.layer) }
+        }
     }
 
     private func sync(game: ThumbWarGame, dt: Float) {
